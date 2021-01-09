@@ -1,5 +1,5 @@
 [package]
-name = "git_pr_blame"
+name = "git-pr-blame"
 version = "0.1.0"
 authors = ["Joel Nises <joel.nises@gmail.com>"]
 edition = "2018"

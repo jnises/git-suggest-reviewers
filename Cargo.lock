@@ -101,6 +101,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "git-pr-blame"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "env_logger",
+ "git2",
+ "log",
+ "structopt",
+]
+
+[[package]]
 name = "git2"
 version = "0.13.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -113,17 +124,6 @@ dependencies = [
  "openssl-probe",
  "openssl-sys",
  "url",
-]
-
-[[package]]
-name = "git_pr_blame"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "env_logger",
- "git2",
- "log",
- "structopt",
 ]
 
 [[package]]
