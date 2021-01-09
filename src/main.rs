@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use git2::{Blame, DiffDelta, DiffFormat, DiffHunk, DiffLine, Oid, Repository};
-use log::info;
-use std::path::Path;
+use log::{info, warn};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -30,7 +30,7 @@ fn main() -> Result<()> {
         .filter_level(if opt.verbose {
             log::LevelFilter::Info
         } else {
-            log::LevelFilter::Warn
+            log::LevelFilter::Error
         })
         .init();
     let repo = Repository::open(".")?;
@@ -50,7 +50,7 @@ fn main() -> Result<()> {
     //     true
     // })?;
     // println!("diff: {:?}", diff.stats()?);
-    let mut blame: Option<(&Path, Blame)> = None;
+    let mut blame_cache: Option<(PathBuf, Result<Blame, git2::Error>)> = None;
     diff.foreach(
         // file_cb
         &mut |delta: DiffDelta, _| {
@@ -67,14 +67,18 @@ fn main() -> Result<()> {
         None,
         // line_cb
         Some(
-            &mut |delta: DiffDelta, hunk: Option<DiffHunk>, line: DiffLine| {
+            &mut |delta: DiffDelta, _hunk: Option<DiffHunk>, line: DiffLine| {
                 if let Some(path) = delta.old_file().path() {
-                    if blame.is_none() || blame.unwrap().0 != path {
-                        blame = Some(repo.blame_file(path, None))
+                    if blame_cache.is_none() || blame_cache.as_ref().unwrap().0 != path {
+                        let newblame = repo.blame_file(path, None);
+                        if let Err(ref e) = newblame {
+                            warn!("error blaming {:?}: {}", path, e);
+                        }
+                        blame_cache = Some((path.to_path_buf(), newblame));
                     }
-                    // dbg!(delta);
-                    // dbg!(hunk);
-                    // dbg!(line);
+                    if let Ok(blame) = &blame_cache.as_ref().unwrap().1 {
+                        print!("{}", String::from_utf8_lossy(line.content()));
+                    }
                 }
                 true
             },
