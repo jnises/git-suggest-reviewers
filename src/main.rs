@@ -34,8 +34,13 @@ fn main() -> Result<()> {
         })
         .init();
     let repo = Repository::open(".")?;
-    let base = ref_or_id(&repo, &opt.base).context("unable to find base")?;
-    let compare = ref_or_id(&repo, &opt.compare).context("unable to find compare")?;
+    // let base = repo.revparse_single(&opt.base).context("unable to find base")?.id();
+    let base = repo.revparse_ext(&opt.base).context("unable to find base")?.0.id();
+    info!("base: {}", base);
+    // let base = ref_or_id(&repo, &opt.base).context("unable to find base")?;
+    let compare = repo.revparse_single(&opt.compare).context("unable to find compare")?.id();
+    info!("compare: {}", compare);
+    // let compare = ref_or_id(&repo, &opt.compare).context("unable to find compare")?;
     let compare_tree = repo.find_commit(compare)?.tree()?;
     let merge_base = repo
         .merge_base(base, compare)
@@ -67,12 +72,15 @@ fn main() -> Result<()> {
         None,
         // hunk_cb
         Some(&mut |delta: DiffDelta, hunk: DiffHunk| {
+            // TODO do we get extra context lines for each chunk?
             if let Some(path) = delta.old_file().path() {
                 if blame_cache.is_none() || blame_cache.as_ref().unwrap().0 != path {
+                    debug!("blaming {:?}", path);
                     let newblame =
                         repo.blame_file(path, Some(BlameOptions::new().newest_commit(merge_base)));
                     if let Err(ref e) = newblame {
-                        warn!("error blaming {:?}: {}", path, e);
+                        // this happens if this is a new file. should detect that..
+                        debug!("error blaming {:?}: {}", path, e);
                     }
                     blame_cache = Some((path.to_path_buf(), newblame));
                 }
@@ -104,25 +112,6 @@ fn main() -> Result<()> {
         }),
         // line_cb
         None,
-        // Some(
-        //     &mut |delta: DiffDelta, _hunk: Option<DiffHunk>, line: DiffLine| {
-        //         if let Some(path) = delta.old_file().path() {
-        //             if blame_cache.is_none() || blame_cache.as_ref().unwrap().0 != path {
-        //                 let newblame = repo.blame_file(path, Some(BlameOptions::new().newest_commit(merge_base)));
-        //                 if let Err(ref e) = newblame {
-        //                     warn!("error blaming {:?}: {}", path, e);
-        //                 }
-        //                 blame_cache = Some((path.to_path_buf(), newblame));
-        //             }
-        //             if let Ok(blame) = &blame_cache.as_ref().unwrap().1 {
-        //                 let offset = line.content_offset();
-        //                 blame.
-        //                 print!("{}", String::from_utf8_lossy(line.content()));
-        //             }
-        //         }
-        //         true
-        //     },
-        // ),
     )?;
     debug!("done!");
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
