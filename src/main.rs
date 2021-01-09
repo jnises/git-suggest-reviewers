@@ -1,33 +1,84 @@
-use anyhow::{Result, anyhow, Context};
+use anyhow::{anyhow, Context, Result};
+use git2::{Blame, DiffDelta, DiffFormat, DiffHunk, DiffLine, Oid, Repository};
+use log::info;
+use std::path::Path;
 use structopt::StructOpt;
-use git2::{Repository, DiffFormat};
 
 #[derive(Debug, StructOpt)]
 #[structopt(about = "List authors of lines changed by PR")]
 struct Opt {
     /// where to merge to
-    #[structopt()]
     base: String,
 
     /// where to merge from
-    #[structopt()]
     compare: String,
+
+    #[structopt(short, long)]
+    verbose: bool,
+}
+
+fn ref_or_id(repo: &Repository, name: &str) -> Result<Oid> {
+    Ok(match Oid::from_str(name) {
+        Ok(oid) => oid,
+        Err(_) => repo.refname_to_id(name)?,
+    })
 }
 
 fn main() -> Result<()> {
     let opt = Opt::from_args();
+    env_logger::builder()
+        .filter_level(if opt.verbose {
+            log::LevelFilter::Info
+        } else {
+            log::LevelFilter::Warn
+        })
+        .init();
     let repo = Repository::open(".")?;
-    let base = repo.find_reference(&opt.base).context("unable to find base")?.resolve()?;
-    let base_oid = base.target().ok_or_else(|| anyhow!("cannot find base {:?}", base.name()))?;
-    let compare = repo.find_reference(&opt.compare)?.resolve()?;
-    let compare_oid = compare.target().ok_or_else(|| anyhow!("cannot find compare {:?}", base.name()))?;
-    let merge_base = repo.merge_base(base_oid, compare_oid)?;
-    let merge_base_tree = repo.find_tree(merge_base)?;
-    println!("merge base: {:?}", merge_base_tree);
-    let diff = repo.diff_tree_to_tree(Some(&merge_base_tree), Some(&compare.peel_to_tree()?), None)?;
-    diff.print(DiffFormat::Patch, |delta, hunk, line| {
-        println!("{:?} {:?} {:?}", delta, hunk, line);
-        true
-    })?;
+    let base = ref_or_id(&repo, &opt.base).context("unable to find base")?;
+    let compare = ref_or_id(&repo, &opt.compare).context("unable to find compare")?;
+    let compare_tree = repo.find_commit(compare)?.tree()?;
+    let merge_base = repo
+        .merge_base(base, compare)
+        .context("unable to find merge base")?;
+    let merge_base_tree = repo.find_commit(merge_base)?.tree()?;
+    if opt.verbose {
+        info!("merge base: {:?}", merge_base);
+    }
+    let diff = repo.diff_tree_to_tree(Some(&merge_base_tree), Some(&compare_tree), None)?;
+    // diff.print(DiffFormat::Patch, |delta, hunk, line| {
+    //     println!("{:?} {:?} {:?}", delta, hunk, line);
+    //     true
+    // })?;
+    // println!("diff: {:?}", diff.stats()?);
+    let mut blame: Option<(&Path, Blame)> = None;
+    diff.foreach(
+        // file_cb
+        &mut |delta: DiffDelta, _| {
+            info!(
+                "from: {:?} to: {:?}",
+                delta.old_file().path(),
+                delta.new_file().path()
+            );
+            true
+        },
+        // binary_cb
+        None,
+        // hunk_cb
+        None,
+        // line_cb
+        Some(
+            &mut |delta: DiffDelta, hunk: Option<DiffHunk>, line: DiffLine| {
+                if let Some(path) = delta.old_file().path() {
+                    if blame.is_none() || blame.unwrap().0 != path {
+                        blame = Some(repo.blame_file(path, None))
+                    }
+                    // dbg!(delta);
+                    // dbg!(hunk);
+                    // dbg!(line);
+                }
+                true
+            },
+        ),
+    )?;
     Ok(())
 }
