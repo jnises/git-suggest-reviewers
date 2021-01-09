@@ -16,6 +16,9 @@ struct Opt {
     /// where to merge from
     compare: String,
 
+    #[structopt(long, default_value = "1073741824")] // 1 MB
+    max_blame_size: u64,
+
     #[structopt(short, long)]
     verbose: bool,
 }
@@ -73,23 +76,40 @@ fn main() -> Result<()> {
         Some(&mut |delta: DiffDelta, hunk: DiffHunk| {
             // TODO do we get extra context lines for each chunk?
             if let Some(path) = delta.old_file().path() {
-                if blame_cache.is_none() || blame_cache.as_ref().unwrap().0 != path {
-                    blame_cache = None;
-                    debug!("blaming {:?}", path);
-                    let newblame = repo.blame_file(
-                        path,
-                        Some(
-                            BlameOptions::new()
-                                .newest_commit(merge_base)
-                                .use_mailmap(true),
-                        ),
-                    );
-                    debug!("done blaming");
-                    if let Err(ref e) = newblame {
-                        // this happens if this is a new file. should detect that..
-                        debug!("error blaming {:?}: {}", path, e);
+                let pathbuf = path.to_path_buf();
+                if blame_cache.is_none() || blame_cache.as_ref().unwrap().0 != pathbuf {
+                    blame_cache =
+                        Some((pathbuf.clone(), Err(git2::Error::from_str("not created"))));
+                    // TODO don't blame submodules
+                    if delta.old_file().is_binary() || delta.new_file().is_binary() {
+                        debug!("skipping blame of {:?} because it is binary", path);
+                    } else if delta.old_file().size() > opt.max_blame_size
+                        || delta.new_file().size() > opt.max_blame_size
+                    {
+                        debug!(
+                            "skipping blame of {:?} because it is too large ({})",
+                            path,
+                            std::cmp::max(delta.old_file().size(), delta.new_file().size())
+                        );
+                    } else if !delta.old_file().exists() || !delta.new_file().exists() {
+                        debug!("skipping blame of {:?} because the file was created or deleted", path);
+                    } else {
+                        debug!("blaming {:?}", path);
+                        let newblame = repo.blame_file(
+                            path,
+                            Some(
+                                BlameOptions::new()
+                                    .newest_commit(merge_base)
+                                    .use_mailmap(true),
+                            ),
+                        );
+                        debug!("done blaming");
+                        if let Err(ref e) = newblame {
+                            // this happens if this is a new file. should detect that..
+                            debug!("error blaming {:?}: {}", path, e);
+                        }
+                        blame_cache = Some((path.to_path_buf(), newblame));
                     }
-                    blame_cache = Some((path.to_path_buf(), newblame));
                 }
                 if let Ok(blame) = &blame_cache.as_ref().unwrap().1 {
                     for line in hunk.old_start()..(hunk.old_start() + hunk.old_lines()) {
