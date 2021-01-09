@@ -124,6 +124,11 @@ fn main() -> Result<()> {
         //     },
         // ),
     )?;
-    print!("modified: {:?}", modified);
+    debug!("done!");
+    let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
+    modified_sorted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    for ((name, email), lines) in modified_sorted.into_iter() {
+        println!("{}\t{} ({})", lines, name.unwrap_or("?".into()), email.unwrap_or("?".into()));
+    }
     Ok(())
 }
