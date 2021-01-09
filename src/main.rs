@@ -1,5 +1,8 @@
 use anyhow::{anyhow, Context, Result};
-use git2::{Blame, BlameOptions, DiffDelta, DiffFormat, DiffHunk, DiffLine, Oid, Repository};
+use git2::{
+    Blame, BlameOptions, DiffDelta, DiffFindOptions, DiffFormat, DiffHunk, DiffLine, Oid,
+    Repository,
+};
 use log::{debug, error, info, warn};
 use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
@@ -17,13 +20,6 @@ struct Opt {
     verbose: bool,
 }
 
-fn ref_or_id(repo: &Repository, name: &str) -> Result<Oid> {
-    Ok(match Oid::from_str(name) {
-        Ok(oid) => oid,
-        Err(_) => repo.refname_to_id(name)?,
-    })
-}
-
 fn main() -> Result<()> {
     let opt = Opt::from_args();
     env_logger::builder()
@@ -34,22 +30,25 @@ fn main() -> Result<()> {
         })
         .init();
     let repo = Repository::open(".")?;
-    // let base = repo.revparse_single(&opt.base).context("unable to find base")?.id();
-    let base = repo.revparse_ext(&opt.base).context("unable to find base")?.0.id();
+    let base = repo
+        .revparse_single(&opt.base)
+        .context("unable to find base")?
+        .id();
     info!("base: {}", base);
-    // let base = ref_or_id(&repo, &opt.base).context("unable to find base")?;
-    let compare = repo.revparse_single(&opt.compare).context("unable to find compare")?.id();
+    let compare = repo
+        .revparse_single(&opt.compare)
+        .context("unable to find compare")?
+        .id();
     info!("compare: {}", compare);
-    // let compare = ref_or_id(&repo, &opt.compare).context("unable to find compare")?;
     let compare_tree = repo.find_commit(compare)?.tree()?;
     let merge_base = repo
         .merge_base(base, compare)
         .context("unable to find merge base")?;
     let merge_base_tree = repo.find_commit(merge_base)?.tree()?;
-    if opt.verbose {
-        info!("merge base: {:?}", merge_base);
-    }
-    let diff = repo.diff_tree_to_tree(Some(&merge_base_tree), Some(&compare_tree), None)?;
+    info!("merge base: {:?}", merge_base);
+    let mut diff = repo.diff_tree_to_tree(Some(&merge_base_tree), Some(&compare_tree), None)?;
+    debug!("finding similar");
+    diff.find_similar(Some(DiffFindOptions::new().by_config()))?;
     // TODO need to do some rename detection on the diff?
     // diff.print(DiffFormat::Patch, |delta, hunk, line| {
     //     println!("{:?} {:?} {:?}", delta, hunk, line);
@@ -75,9 +74,17 @@ fn main() -> Result<()> {
             // TODO do we get extra context lines for each chunk?
             if let Some(path) = delta.old_file().path() {
                 if blame_cache.is_none() || blame_cache.as_ref().unwrap().0 != path {
+                    blame_cache = None;
                     debug!("blaming {:?}", path);
-                    let newblame =
-                        repo.blame_file(path, Some(BlameOptions::new().newest_commit(merge_base)));
+                    let newblame = repo.blame_file(
+                        path,
+                        Some(
+                            BlameOptions::new()
+                                .newest_commit(merge_base)
+                                .use_mailmap(true),
+                        ),
+                    );
+                    debug!("done blaming");
                     if let Err(ref e) = newblame {
                         // this happens if this is a new file. should detect that..
                         debug!("error blaming {:?}: {}", path, e);
@@ -115,9 +122,15 @@ fn main() -> Result<()> {
     )?;
     debug!("done!");
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
+    // reversed
     modified_sorted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
     for ((name, email), lines) in modified_sorted.into_iter() {
-        println!("{}\t{} ({})", lines, name.unwrap_or("?".into()), email.unwrap_or("?".into()));
+        println!(
+            "{}\t{} ({})",
+            lines,
+            name.unwrap_or("?".into()),
+            email.unwrap_or("?".into())
+        );
     }
     Ok(())
 }
