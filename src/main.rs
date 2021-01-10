@@ -66,7 +66,6 @@ fn main() -> Result<()> {
         ),
     )?;
     progress.tick();
-    debug!("finding similar");
     diff.find_similar(Some(DiffFindOptions::new().by_config()))?;
     progress.tick();
     let mut modified: HashMap<(Option<String>, Option<String>), usize> = HashMap::new();
@@ -78,11 +77,6 @@ fn main() -> Result<()> {
         match Patch::from_diff(&diff, deltaidx) {
             Ok(Some(patch)) => {
                 let delta = patch.delta();
-                info!(
-                    "from: {:?} to: {:?}",
-                    delta.old_file().path(),
-                    delta.new_file().path()
-                );
                 if delta.old_file().mode() != FileMode::Blob
                     || delta.new_file().mode() != FileMode::Blob
                 {
@@ -104,11 +98,19 @@ fn main() -> Result<()> {
                         std::cmp::max(delta.old_file().size(), delta.new_file().size())
                     );
                 } else if !delta.old_file().exists() || !delta.new_file().exists() {
+                    // TODO include all lines from removed file
                     debug!(
                         "skipping blame of {:?} because the file was created or deleted",
                         delta.old_file().path()
                     );
                 } else {
+                    if let (Some(oldp), Some(newp)) = (delta.old_file().path(), delta.new_file().path()) {
+                        if oldp == newp {
+                            info!("processing {:?}", oldp);
+                        } else {
+                            info!("processing {:?} -> {:?}", oldp, newp);
+                        }
+                    }
                     let path = delta.old_file().path().unwrap(); // unwrap since we have already checked that it exists
                     debug!("blaming {:?}", path);
                     // TODO only blame the lines needed to cover all chunks
