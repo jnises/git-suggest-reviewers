@@ -133,11 +133,24 @@ fn main() -> Result<()> {
                                 {
                                     if let Some(oldhunk) = blame.get_line(line as usize) {
                                         let sign = oldhunk.final_signature();
-                                        let author = (
-                                            sign.name().map(|s| String::from(s)),
-                                            sign.email().map(|s| String::from(s)),
-                                        );
-                                        modified.entry(author).and_modify(|e| *e += 1).or_insert(1);
+                                        // !!!!! horrible hack to work around bug in libgit2
+                                        struct HackSignature {
+                                            raw: *const std::ffi::c_void,
+                                            _owned: bool,
+                                        }
+                                        let signptr: &HackSignature = unsafe { std::mem::transmute(&sign) };
+                                        if signptr.raw.is_null() {
+                                            warn!("bad signature found in file: {:?}. might be an author without an email or something (bug in libgit2)", path);
+                                        } else {
+                                            let author = (
+                                                sign.name().map(|s| String::from(s)),
+                                                sign.email().map(|s| String::from(s)),
+                                            );
+                                            modified
+                                                .entry(author)
+                                                .and_modify(|e| *e += 1)
+                                                .or_insert(1);
+                                        }
                                     } else {
                                         debug!(
                                             "line {} not found in {:?}@{}",
