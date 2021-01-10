@@ -1,12 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use git2::{
     Blame, BlameOptions, DiffDelta, DiffFindOptions, DiffFormat, DiffHunk, DiffLine, DiffOptions,
-    Oid, Repository, FileMode,
+    FileMode, Oid, Repository,
 };
+use indicatif::ProgressBar;
 use log::{debug, error, info, warn};
 use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
-use indicatif::ProgressBar;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -22,6 +22,7 @@ struct Opt {
     #[structopt(long, default_value = "1073741824")] // 1 MB
     max_blame_size: u64,
 
+    /// more printouts, disables progress reporting
     #[structopt(short, long)]
     verbose: bool,
 
@@ -38,7 +39,11 @@ fn main() -> Result<()> {
             log::LevelFilter::Warn
         })
         .init();
-    let progress = if opt.no_progress { ProgressBar::hidden() } else { ProgressBar::new(1100) };
+    let progress = if opt.no_progress || opt.verbose {
+        ProgressBar::hidden()
+    } else {
+        ProgressBar::new(1100)
+    };
     let repo = Repository::discover(".")?;
     progress.set_position(10);
     let base = repo
@@ -60,7 +65,12 @@ fn main() -> Result<()> {
     let mut diff = repo.diff_tree_to_tree(
         Some(&merge_base_tree),
         Some(&compare_tree),
-        Some(DiffOptions::new().ignore_submodules(true)),
+        Some(
+            DiffOptions::new()
+                .ignore_submodules(true)
+                // 3 lines context (same as default), so we get the authors of the lines around each modification
+                .context_lines(3),
+        ),
     )?;
     progress.set_position(40);
     debug!("finding similar");
@@ -91,14 +101,15 @@ fn main() -> Result<()> {
         // hunk_cb
         Some(&mut |delta: DiffDelta, hunk: DiffHunk| {
             debug!("hunk: {:?}", hunk);
-            // TODO do we get extra context lines for each chunk?
             if let Some(path) = delta.old_file().path() {
                 let pathbuf = path.to_path_buf();
                 if blame_cache.is_none() || blame_cache.as_ref().unwrap().0 != pathbuf {
                     blame_cache =
                         Some((pathbuf.clone(), Err(git2::Error::from_str("not created"))));
                     //debug!("delta old mode: {:?}. new mode: {:?}", delta.old_file().mode(), delta.new_file().mode());
-                    if delta.old_file().mode() != FileMode::Blob || delta.new_file().mode() != FileMode::Blob {
+                    if delta.old_file().mode() != FileMode::Blob
+                        || delta.new_file().mode() != FileMode::Blob
+                    {
                         debug!("skipping blame of {:?} because it isn't a blob", path);
                     } else if delta.old_file().is_binary() || delta.new_file().is_binary() {
                         debug!("skipping blame of {:?} because it is binary", path);
@@ -167,6 +178,7 @@ fn main() -> Result<()> {
     // reversed
     modified_sorted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
     progress.set_position(1100);
+    progress.finish();
     for ((name, email), lines) in modified_sorted.into_iter() {
         println!(
             "{}\t{} ({})",
