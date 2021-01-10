@@ -3,7 +3,7 @@ use git2::{
     Blame, BlameOptions, DiffDelta, DiffFindOptions, DiffFormat, DiffHunk, DiffLine, DiffOptions,
     FileMode, Oid, Patch, Repository,
 };
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, error, info, warn};
 use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
@@ -42,10 +42,10 @@ fn main() -> Result<()> {
     let progress = if opt.no_progress || opt.verbose {
         ProgressBar::hidden()
     } else {
-        ProgressBar::new(1100)
+        ProgressBar::new_spinner()
     };
     let repo = Repository::discover(".")?;
-    progress.set_position(10);
+    progress.tick();
     let base = repo
         .revparse_single(&opt.base)
         .context("unable to find base")?
@@ -72,10 +72,10 @@ fn main() -> Result<()> {
                 .context_lines(3),
         ),
     )?;
-    progress.set_position(40);
+    progress.tick();
     debug!("finding similar");
     diff.find_similar(Some(DiffFindOptions::new().by_config()))?;
-    progress.set_position(50);
+    progress.tick();
     // TODO need to do some rename detection on the diff?
     // diff.print(DiffFormat::Patch, |delta, hunk, line| {
     //     println!("{:?} {:?} {:?}", delta, hunk, line);
@@ -85,11 +85,13 @@ fn main() -> Result<()> {
     let mut modified: HashMap<(Option<String>, Option<String>), usize> = HashMap::new();
     // let mut blame_cache: Option<(PathBuf, Result<Blame, git2::Error>)> = None;
     let num_deltas = diff.deltas().len();
+    progress.set_style(ProgressStyle::default_bar());
+    progress.set_length(num_deltas as u64);
     for deltaidx in 0..num_deltas {
+        progress.set_position(deltaidx as u64);
         match Patch::from_diff(&diff, deltaidx) {
             Ok(Some(patch)) => {
                 let delta = patch.delta();
-                progress.set_position(50 + (1000 * deltaidx / num_deltas) as u64);
                 info!(
                     "from: {:?} to: {:?}",
                     delta.old_file().path(),
@@ -263,7 +265,6 @@ fn main() -> Result<()> {
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
     // reversed
     modified_sorted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-    progress.set_position(1100);
     progress.finish();
     for ((name, email), lines) in modified_sorted.into_iter() {
         println!(
