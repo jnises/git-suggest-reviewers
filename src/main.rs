@@ -178,7 +178,7 @@ fn main() -> Result<()> {
     progress.finish();
     for ((name, email), lines) in modified_sorted.into_iter() {
         println!(
-            "{}\t{} ({})",
+            "{}\t{} <{}>",
             lines,
             name.unwrap_or("?".into()),
             email.unwrap_or("?".into())
