@@ -116,7 +116,6 @@ fn main() -> Result<()> {
                         }
                     }
                     let path = delta.old_file().path().unwrap(); // unwrap since we have already checked that it exists
-                                                                 // TODO only blame the lines needed to cover all chunks
                     match repo.blame_file(
                         path,
                         Some(
