@@ -10,21 +10,21 @@ use structopt::StructOpt;
     about = "List authors of lines changed by PR, including a few lines around the changed ones."
 )]
 struct Opt {
-    /// where to merge to
+    /// Where to merge to
     base: String,
 
-    /// where to merge from
+    /// Where to merge from
     compare: String,
 
-    /// ignore files larger than this (in bytes) to make things faster
+    /// Ignore files larger than this (in bytes) to make things faster
     #[structopt(long, default_value = "1073741824")] // 1 MB
     max_blame_size: u64,
 
-    /// verbose mode (-v, -vv, -vvv, etc), disables progress reporting
+    /// Verbose mode (-v, -vv, -vvv, etc), disables progress reporting
     #[structopt(short, long, parse(from_occurrences))]
     verbose: usize,
 
-    /// don't display a progress bar
+    /// Don't display a progress bar
     #[structopt(long)]
     no_progress: bool,
 }
