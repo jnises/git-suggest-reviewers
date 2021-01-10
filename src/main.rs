@@ -175,7 +175,7 @@ fn main() -> Result<()> {
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
     // reversed
     modified_sorted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-    progress.finish();
+    progress.finish_and_clear();
     for ((name, email), lines) in modified_sorted.into_iter() {
         println!(
             "{}\t{} <{}>",
