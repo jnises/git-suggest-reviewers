@@ -1,11 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use git2::{
     Blame, BlameOptions, DiffDelta, DiffFindOptions, DiffFormat, DiffHunk, DiffLine, DiffOptions,
-    Oid, Repository,
+    Oid, Repository, FileMode,
 };
 use log::{debug, error, info, warn};
 use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
+use indicatif::ProgressBar;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -23,6 +24,9 @@ struct Opt {
 
     #[structopt(short, long)]
     verbose: bool,
+
+    #[structopt(long)]
+    no_progress: bool,
 }
 
 fn main() -> Result<()> {
@@ -34,7 +38,9 @@ fn main() -> Result<()> {
             log::LevelFilter::Warn
         })
         .init();
+    let progress = if opt.no_progress { ProgressBar::hidden() } else { ProgressBar::new(1100) };
     let repo = Repository::discover(".")?;
+    progress.set_position(10);
     let base = repo
         .revparse_single(&opt.base)
         .context("unable to find base")?
@@ -56,8 +62,10 @@ fn main() -> Result<()> {
         Some(&compare_tree),
         Some(DiffOptions::new().ignore_submodules(true)),
     )?;
+    progress.set_position(40);
     debug!("finding similar");
     diff.find_similar(Some(DiffFindOptions::new().by_config()))?;
+    progress.set_position(50);
     // TODO need to do some rename detection on the diff?
     // diff.print(DiffFormat::Patch, |delta, hunk, line| {
     //     println!("{:?} {:?} {:?}", delta, hunk, line);
@@ -68,7 +76,9 @@ fn main() -> Result<()> {
     let mut blame_cache: Option<(PathBuf, Result<Blame, git2::Error>)> = None;
     diff.foreach(
         // file_cb
-        &mut |delta: DiffDelta, _| {
+        &mut |delta: DiffDelta, p: f32| {
+            progress.set_position(50 + (p * 1000f32) as u64);
+            debug!("p: {}", p);
             info!(
                 "from: {:?} to: {:?}",
                 delta.old_file().path(),
@@ -87,8 +97,10 @@ fn main() -> Result<()> {
                 if blame_cache.is_none() || blame_cache.as_ref().unwrap().0 != pathbuf {
                     blame_cache =
                         Some((pathbuf.clone(), Err(git2::Error::from_str("not created"))));
-                    // TODO don't blame submodules
-                    if delta.old_file().is_binary() || delta.new_file().is_binary() {
+                    //debug!("delta old mode: {:?}. new mode: {:?}", delta.old_file().mode(), delta.new_file().mode());
+                    if delta.old_file().mode() != FileMode::Blob || delta.new_file().mode() != FileMode::Blob {
+                        debug!("skipping blame of {:?} because it isn't a blob", path);
+                    } else if delta.old_file().is_binary() || delta.new_file().is_binary() {
                         debug!("skipping blame of {:?} because it is binary", path);
                     } else if delta.old_file().size() > opt.max_blame_size
                         || delta.new_file().size() > opt.max_blame_size
@@ -154,6 +166,7 @@ fn main() -> Result<()> {
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
     // reversed
     modified_sorted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    progress.set_position(1100);
     for ((name, email), lines) in modified_sorted.into_iter() {
         println!(
             "{}\t{} ({})",
