@@ -112,7 +112,6 @@ fn main() -> Result<()> {
                         }
                     }
                     let path = delta.old_file().path().unwrap(); // unwrap since we have already checked that it exists
-                    debug!("blaming {:?}", path);
                     // TODO only blame the lines needed to cover all chunks
                     match repo.blame_file(
                         path,
@@ -123,10 +122,8 @@ fn main() -> Result<()> {
                         ),
                     ) {
                         Ok(blame) => {
-                            debug!("done blaming");
                             for hunkidx in 0..patch.num_hunks() {
                                 let (hunk, _) = patch.hunk(hunkidx)?;
-                                debug!("hunk: {:?}", hunk);
                                 for line in hunk.old_start()..(hunk.old_start() + hunk.old_lines())
                                 {
                                     if let Some(oldhunk) = blame.get_line(line as usize) {
@@ -157,7 +154,6 @@ fn main() -> Result<()> {
             Ok(None) => {}
         }
     }
-    debug!("done!");
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
     // reversed
     modified_sorted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
