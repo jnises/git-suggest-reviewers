@@ -1,14 +1,16 @@
 use anyhow::{anyhow, Context, Result};
 use git2::{
-    Blame, BlameOptions, DiffDelta, DiffFindOptions, DiffFormat, DiffHunk, DiffLine, Oid,
-    Repository,
+    Blame, BlameOptions, DiffDelta, DiffFindOptions, DiffFormat, DiffHunk, DiffLine, DiffOptions,
+    Oid, Repository,
 };
 use log::{debug, error, info, warn};
 use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(about = "List authors of lines changed by PR")]
+#[structopt(
+    about = "List authors of lines changed by PR, including lines around the changed ones."
+)]
 struct Opt {
     /// where to merge to
     base: String,
@@ -32,7 +34,7 @@ fn main() -> Result<()> {
             log::LevelFilter::Warn
         })
         .init();
-    let repo = Repository::open(".")?;
+    let repo = Repository::discover(".")?;
     let base = repo
         .revparse_single(&opt.base)
         .context("unable to find base")?
@@ -49,7 +51,11 @@ fn main() -> Result<()> {
         .context("unable to find merge base")?;
     let merge_base_tree = repo.find_commit(merge_base)?.tree()?;
     info!("merge base: {:?}", merge_base);
-    let mut diff = repo.diff_tree_to_tree(Some(&merge_base_tree), Some(&compare_tree), None)?;
+    let mut diff = repo.diff_tree_to_tree(
+        Some(&merge_base_tree),
+        Some(&compare_tree),
+        Some(DiffOptions::new().ignore_submodules(true)),
+    )?;
     debug!("finding similar");
     diff.find_similar(Some(DiffFindOptions::new().by_config()))?;
     // TODO need to do some rename detection on the diff?
@@ -74,6 +80,7 @@ fn main() -> Result<()> {
         None,
         // hunk_cb
         Some(&mut |delta: DiffDelta, hunk: DiffHunk| {
+            debug!("hunk: {:?}", hunk);
             // TODO do we get extra context lines for each chunk?
             if let Some(path) = delta.old_file().path() {
                 let pathbuf = path.to_path_buf();
@@ -92,7 +99,10 @@ fn main() -> Result<()> {
                             std::cmp::max(delta.old_file().size(), delta.new_file().size())
                         );
                     } else if !delta.old_file().exists() || !delta.new_file().exists() {
-                        debug!("skipping blame of {:?} because the file was created or deleted", path);
+                        debug!(
+                            "skipping blame of {:?} because the file was created or deleted",
+                            path
+                        );
                     } else {
                         debug!("blaming {:?}", path);
                         let newblame = repo.blame_file(
