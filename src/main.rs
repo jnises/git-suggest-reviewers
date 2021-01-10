@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use git2::{
     Blame, BlameOptions, DiffDelta, DiffFindOptions, DiffFormat, DiffHunk, DiffLine, DiffOptions,
-    FileMode, Oid, Repository,
+    FileMode, Oid, Patch, Repository,
 };
 use indicatif::ProgressBar;
 use log::{debug, error, info, warn};
@@ -83,96 +83,182 @@ fn main() -> Result<()> {
     // })?;
     // println!("diff: {:?}", diff.stats()?);
     let mut modified: HashMap<(Option<String>, Option<String>), usize> = HashMap::new();
-    let mut blame_cache: Option<(PathBuf, Result<Blame, git2::Error>)> = None;
-    diff.foreach(
-        // file_cb
-        &mut |delta: DiffDelta, p: f32| {
-            progress.set_position(50 + (p * 1000f32) as u64);
-            debug!("p: {}", p);
-            info!(
-                "from: {:?} to: {:?}",
-                delta.old_file().path(),
-                delta.new_file().path()
-            );
-            true
-        },
-        // binary_cb
-        None,
-        // hunk_cb
-        Some(&mut |delta: DiffDelta, hunk: DiffHunk| {
-            debug!("hunk: {:?}", hunk);
-            if let Some(path) = delta.old_file().path() {
-                let pathbuf = path.to_path_buf();
-                if blame_cache.is_none() || blame_cache.as_ref().unwrap().0 != pathbuf {
-                    blame_cache =
-                        Some((pathbuf.clone(), Err(git2::Error::from_str("not created"))));
-                    //debug!("delta old mode: {:?}. new mode: {:?}", delta.old_file().mode(), delta.new_file().mode());
-                    if delta.old_file().mode() != FileMode::Blob
-                        || delta.new_file().mode() != FileMode::Blob
-                    {
-                        debug!("skipping blame of {:?} because it isn't a blob", path);
-                    } else if delta.old_file().is_binary() || delta.new_file().is_binary() {
-                        debug!("skipping blame of {:?} because it is binary", path);
-                    } else if delta.old_file().size() > opt.max_blame_size
-                        || delta.new_file().size() > opt.max_blame_size
-                    {
-                        debug!(
-                            "skipping blame of {:?} because it is too large ({})",
-                            path,
-                            std::cmp::max(delta.old_file().size(), delta.new_file().size())
-                        );
-                    } else if !delta.old_file().exists() || !delta.new_file().exists() {
-                        debug!(
-                            "skipping blame of {:?} because the file was created or deleted",
-                            path
-                        );
-                    } else {
-                        debug!("blaming {:?}", path);
-                        let newblame = repo.blame_file(
-                            path,
-                            Some(
-                                BlameOptions::new()
-                                    .newest_commit(merge_base)
-                                    .use_mailmap(true),
-                            ),
-                        );
-                        debug!("done blaming");
-                        if let Err(ref e) = newblame {
-                            // this happens if this is a new file. should detect that..
+    // let mut blame_cache: Option<(PathBuf, Result<Blame, git2::Error>)> = None;
+    let num_deltas = diff.deltas().len();
+    for deltaidx in 0..num_deltas {
+        match Patch::from_diff(&diff, deltaidx) {
+            Ok(Some(patch)) => {
+                let delta = patch.delta();
+                progress.set_position(50 + (1000 * deltaidx / num_deltas) as u64);
+                info!(
+                    "from: {:?} to: {:?}",
+                    delta.old_file().path(),
+                    delta.new_file().path()
+                );
+                if delta.old_file().mode() != FileMode::Blob
+                    || delta.new_file().mode() != FileMode::Blob
+                {
+                    debug!("skipping blame of {:?} because it isn't a blob", delta.old_file().path());
+                } else if delta.old_file().is_binary() || delta.new_file().is_binary() {
+                    debug!("skipping blame of {:?} because it is binary", delta.old_file().path());
+                } else if delta.old_file().size() > opt.max_blame_size
+                    || delta.new_file().size() > opt.max_blame_size
+                {
+                    debug!(
+                        "skipping blame of {:?} because it is too large ({})",
+                        delta.old_file().path(),
+                        std::cmp::max(delta.old_file().size(), delta.new_file().size())
+                    );
+                } else if !delta.old_file().exists() || !delta.new_file().exists() {
+                    debug!(
+                        "skipping blame of {:?} because the file was created or deleted",
+                        delta.old_file().path()
+                    );
+                } else {
+                    let path = delta.old_file().path().unwrap(); // unwrap since we have already checked that it exists
+                    debug!("blaming {:?}", path);
+                    match repo.blame_file(
+                        path,
+                        Some(
+                            BlameOptions::new()
+                                .newest_commit(merge_base)
+                                .use_mailmap(true),
+                        ),
+                    ) {
+                        Ok(blame) => {
+                            debug!("done blaming");
+                            let pathbuf = path.to_path_buf();
+                            for hunkidx in 0..patch.num_hunks() {
+                                let (hunk, _) = patch.hunk(hunkidx)?;
+                                debug!("hunk: {:?}", hunk);
+                                for line in hunk.old_start()..(hunk.old_start() + hunk.old_lines())
+                                {
+                                    if let Some(oldhunk) = blame.get_line(line as usize) {
+                                        let sign = oldhunk.final_signature();
+                                        let author = (
+                                            sign.name().map(|s| String::from(s)),
+                                            sign.email().map(|s| String::from(s)),
+                                        );
+                                        modified.entry(author).and_modify(|e| *e += 1).or_insert(1);
+                                    // let commit_oid = oldhunk.final_commit_id();
+                                    // if let Ok(commit) = repo.find_commit(commit_oid) {
+                                    //     commit.author()
+                                    // } else {
+                                    //     warn!("cannot find commit with id {}", commit_oid);
+                                    // }
+                                    } else {
+                                        debug!(
+                                            "line {} not found in {:?}@{}",
+                                            line, path, merge_base
+                                        );
+                                    }
+                                }
+                                // let offset = line.content_offset();
+                                // blame.
+                                // print!("{}", String::from_utf8_lossy(line.content()));
+                            }
+                        }
+                        Err(e) => {
                             debug!("error blaming {:?}: {}", path, e);
                         }
-                        blame_cache = Some((path.to_path_buf(), newblame));
                     }
-                }
-                if let Ok(blame) = &blame_cache.as_ref().unwrap().1 {
-                    for line in hunk.old_start()..(hunk.old_start() + hunk.old_lines()) {
-                        if let Some(oldhunk) = blame.get_line(line as usize) {
-                            let sign = oldhunk.final_signature();
-                            let author = (
-                                sign.name().map(|s| String::from(s)),
-                                sign.email().map(|s| String::from(s)),
-                            );
-                            modified.entry(author).and_modify(|e| *e += 1).or_insert(1);
-                        // let commit_oid = oldhunk.final_commit_id();
-                        // if let Ok(commit) = repo.find_commit(commit_oid) {
-                        //     commit.author()
-                        // } else {
-                        //     warn!("cannot find commit with id {}", commit_oid);
-                        // }
-                        } else {
-                            debug!("line {} not found in {:?}@{}", line, path, merge_base);
-                        }
-                    }
-                    // let offset = line.content_offset();
-                    // blame.
-                    // print!("{}", String::from_utf8_lossy(line.content()));
                 }
             }
-            true
-        }),
-        // line_cb
-        None,
-    )?;
+            Err(e) => {
+                warn!("error getting patch from diff: {:?}", e);
+            }
+            Ok(None) => {}
+        }
+    }
+    // diff.foreach(
+    //     // file_cb
+    //     &mut |delta: DiffDelta, p: f32| {
+    //         progress.set_position(50 + (p * 1000f32) as u64);
+    //         debug!("p: {}", p);
+    //         info!(
+    //             "from: {:?} to: {:?}",
+    //             delta.old_file().path(),
+    //             delta.new_file().path()
+    //         );
+    //         true
+    //     },
+    //     // binary_cb
+    //     None,
+    //     // hunk_cb
+    //     Some(&mut |delta: DiffDelta, hunk: DiffHunk| {
+    //         debug!("hunk: {:?}", hunk);
+    //         if let Some(path) = delta.old_file().path() {
+    //             let pathbuf = path.to_path_buf();
+    //             if blame_cache.is_none() || blame_cache.as_ref().unwrap().0 != pathbuf {
+    //                 blame_cache =
+    //                     Some((pathbuf.clone(), Err(git2::Error::from_str("not created"))));
+    //                 //debug!("delta old mode: {:?}. new mode: {:?}", delta.old_file().mode(), delta.new_file().mode());
+    //                 if delta.old_file().mode() != FileMode::Blob
+    //                     || delta.new_file().mode() != FileMode::Blob
+    //                 {
+    //                     debug!("skipping blame of {:?} because it isn't a blob", path);
+    //                 } else if delta.old_file().is_binary() || delta.new_file().is_binary() {
+    //                     debug!("skipping blame of {:?} because it is binary", path);
+    //                 } else if delta.old_file().size() > opt.max_blame_size
+    //                     || delta.new_file().size() > opt.max_blame_size
+    //                 {
+    //                     debug!(
+    //                         "skipping blame of {:?} because it is too large ({})",
+    //                         path,
+    //                         std::cmp::max(delta.old_file().size(), delta.new_file().size())
+    //                     );
+    //                 } else if !delta.old_file().exists() || !delta.new_file().exists() {
+    //                     debug!(
+    //                         "skipping blame of {:?} because the file was created or deleted",
+    //                         path
+    //                     );
+    //                 } else {
+    //                     debug!("blaming {:?}", path);
+    //                     let newblame = repo.blame_file(
+    //                         path,
+    //                         Some(
+    //                             BlameOptions::new()
+    //                                 .newest_commit(merge_base)
+    //                                 .use_mailmap(true),
+    //                         ),
+    //                     );
+    //                     debug!("done blaming");
+    //                     if let Err(ref e) = newblame {
+    //                         // this happens if this is a new file. should detect that..
+    //                         debug!("error blaming {:?}: {}", path, e);
+    //                     }
+    //                     blame_cache = Some((path.to_path_buf(), newblame));
+    //                 }
+    //             }
+    //             if let Ok(blame) = &blame_cache.as_ref().unwrap().1 {
+    //                 for line in hunk.old_start()..(hunk.old_start() + hunk.old_lines()) {
+    //                     if let Some(oldhunk) = blame.get_line(line as usize) {
+    //                         let sign = oldhunk.final_signature();
+    //                         let author = (
+    //                             sign.name().map(|s| String::from(s)),
+    //                             sign.email().map(|s| String::from(s)),
+    //                         );
+    //                         modified.entry(author).and_modify(|e| *e += 1).or_insert(1);
+    //                     // let commit_oid = oldhunk.final_commit_id();
+    //                     // if let Ok(commit) = repo.find_commit(commit_oid) {
+    //                     //     commit.author()
+    //                     // } else {
+    //                     //     warn!("cannot find commit with id {}", commit_oid);
+    //                     // }
+    //                     } else {
+    //                         debug!("line {} not found in {:?}@{}", line, path, merge_base);
+    //                     }
+    //                 }
+    //                 // let offset = line.content_offset();
+    //                 // blame.
+    //                 // print!("{}", String::from_utf8_lossy(line.content()));
+    //             }
+    //         }
+    //         true
+    //     }),
+    //     // line_cb
+    //     None,
+    // )?;
     debug!("done!");
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
     // reversed
