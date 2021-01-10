@@ -77,8 +77,16 @@ fn main() -> Result<()> {
         match Patch::from_diff(&diff, deltaidx) {
             Ok(Some(patch)) => {
                 let delta = patch.delta();
-                if delta.old_file().mode() != FileMode::Blob
-                    || delta.new_file().mode() != FileMode::Blob
+                if !delta.old_file().exists() || !delta.new_file().exists() {
+                    // TODO include all lines from removed file
+                    debug!(
+                        "skipping blame of {:?} because the file was created or deleted",
+                        delta.old_file().path()
+                    );
+                } else if ![FileMode::Blob, FileMode::BlobExecutable]
+                    .contains(&delta.old_file().mode())
+                    || ![FileMode::Blob, FileMode::BlobExecutable]
+                        .contains(&delta.new_file().mode())
                 {
                     debug!(
                         "skipping blame of {:?} because it isn't a blob",
@@ -97,14 +105,10 @@ fn main() -> Result<()> {
                         delta.old_file().path(),
                         std::cmp::max(delta.old_file().size(), delta.new_file().size())
                     );
-                } else if !delta.old_file().exists() || !delta.new_file().exists() {
-                    // TODO include all lines from removed file
-                    debug!(
-                        "skipping blame of {:?} because the file was created or deleted",
-                        delta.old_file().path()
-                    );
                 } else {
-                    if let (Some(oldp), Some(newp)) = (delta.old_file().path(), delta.new_file().path()) {
+                    if let (Some(oldp), Some(newp)) =
+                        (delta.old_file().path(), delta.new_file().path())
+                    {
                         if oldp == newp {
                             info!("processing {:?}", oldp);
                         } else {
@@ -112,7 +116,7 @@ fn main() -> Result<()> {
                         }
                     }
                     let path = delta.old_file().path().unwrap(); // unwrap since we have already checked that it exists
-                    // TODO only blame the lines needed to cover all chunks
+                                                                 // TODO only blame the lines needed to cover all chunks
                     match repo.blame_file(
                         path,
                         Some(
