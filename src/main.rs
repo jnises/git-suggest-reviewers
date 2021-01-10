@@ -16,12 +16,13 @@ struct Opt {
     /// where to merge from
     compare: String,
 
+    /// ignore files larger than this to make things faster
     #[structopt(long, default_value = "1073741824")] // 1 MB
     max_blame_size: u64,
 
-    /// more printouts, disables progress reporting
-    #[structopt(short, long)]
-    verbose: bool,
+    /// verbose mode (-v, -vv, -vvv, etc), disables progress reporting
+    #[structopt(short, long, parse(from_occurrences))]
+    verbose: usize,
 
     #[structopt(long)]
     no_progress: bool,
@@ -29,14 +30,8 @@ struct Opt {
 
 fn main() -> Result<()> {
     let opt = Opt::from_args();
-    env_logger::builder()
-        .filter_level(if opt.verbose {
-            log::LevelFilter::Debug
-        } else {
-            log::LevelFilter::Warn
-        })
-        .init();
-    let progress = if opt.no_progress || opt.verbose {
+    stderrlog::new().verbosity(opt.verbose).init()?;
+    let progress = if opt.no_progress || opt.verbose > 0 {
         ProgressBar::hidden()
     } else {
         ProgressBar::new_spinner()
@@ -115,6 +110,7 @@ fn main() -> Result<()> {
                 } else {
                     let path = delta.old_file().path().unwrap(); // unwrap since we have already checked that it exists
                     debug!("blaming {:?}", path);
+                    // TODO only blame the lines needed to cover all chunks
                     match repo.blame_file(
                         path,
                         Some(
