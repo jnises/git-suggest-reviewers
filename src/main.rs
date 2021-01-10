@@ -118,7 +118,9 @@ fn main() -> Result<()> {
                         Some(
                             BlameOptions::new()
                                 .newest_commit(merge_base)
-                                .use_mailmap(true),
+                                .use_mailmap(true)
+                                // not sure what this one does, but it sounds useful
+                                .track_copies_same_commit_moves(true),
                         ),
                     ) {
                         Ok(blame) => {
