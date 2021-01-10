@@ -16,7 +16,7 @@ struct Opt {
     /// where to merge from
     compare: String,
 
-    /// ignore files larger than this to make things faster
+    /// ignore files larger than this (in bytes) to make things faster
     #[structopt(long, default_value = "1073741824")] // 1 MB
     max_blame_size: u64,
 
@@ -24,6 +24,7 @@ struct Opt {
     #[structopt(short, long, parse(from_occurrences))]
     verbose: usize,
 
+    /// don't display a progress bar
     #[structopt(long)]
     no_progress: bool,
 }
