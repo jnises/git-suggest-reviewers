@@ -2,6 +2,8 @@ git-review-suggestion
 ===================
 Tool that suggests which reviewers to pick for a PR based on who have previously authored the lines modified by the PR.
 
+:warning: not very tested, so might eat your laundry.
+
 requirements
 ------------
 rust (https://rustup.rs/)
@@ -35,3 +37,8 @@ Output will be on lines on the form
 100 Ramon <ramon@example.com> 
 ```
 sorted by the number of lines authored by that developer.
+
+known issues
+------------
+Built using libgit2, so only supports repos that that library can handle.  
+Does not count removed files.
