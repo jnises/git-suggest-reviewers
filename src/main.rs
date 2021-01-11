@@ -20,7 +20,7 @@ struct Opt {
     #[structopt(long, default_value = "1073741824")] // 1 MB
     max_blame_size: u64,
 
-    /// Verbose mode (-v, -vv, -vvv, etc), disables progress reporting
+    /// Verbose mode (-v, -vv, -vvv, etc), disables progress bar
     #[structopt(short, long, parse(from_occurrences))]
     verbose: usize,
 

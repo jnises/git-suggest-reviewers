@@ -21,7 +21,7 @@ usage
         -h, --help           Prints help information
             --no-progress    Don't display a progress bar
         -V, --version        Prints version information
-        -v, --verbose        Verbose mode (-v, -vv, -vvv, etc), disables progress reporting
+        -v, --verbose        Verbose mode (-v, -vv, -vvv, etc), disables progress bar
 
     OPTIONS:
             --context <context>                  How many lines around each modification to count [default: 3]
