@@ -34,4 +34,4 @@ Output will be on lines on the form
 210 Kate <kate@example.com>
 100 Ramon <ramon@example.com> 
 ```
-sorted by the number of line authored by that developer.
+sorted by the number of lines authored by that developer.
