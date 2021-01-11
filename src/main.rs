@@ -65,7 +65,6 @@ fn main() -> Result<()> {
         Some(
             DiffOptions::new()
                 .ignore_submodules(true)
-                // 3 lines context (same as default), so we get the authors of the lines around each modification
                 .context_lines(opt.context),
         ),
     )?;
@@ -137,7 +136,7 @@ fn main() -> Result<()> {
                                 {
                                     if let Some(oldhunk) = blame.get_line(line as usize) {
                                         let sign = oldhunk.final_signature();
-                                        // !!!!! horrible hack to work around bug in libgit2
+                                        // !!!!! horrible hack to work around bug in libgit2 (?)
                                         struct HackSignature {
                                             raw: *const std::ffi::c_void,
                                             _owned: bool,
