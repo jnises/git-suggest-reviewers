@@ -1,5 +1,5 @@
 [package]
-name = "git-review-proposal"
+name = "git-review-suggestion"
 version = "0.1.0"
 authors = ["Joel Nises <joel.nises@gmail.com>"]
 edition = "2018"

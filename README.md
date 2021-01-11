@@ -1,4 +1,4 @@
-git-review-proposal
+git-review-suggestion
 ===================
 Tool that proposes which reviewers to pick for a PR based on who have previously authored the lines modified by the PR.
 
@@ -13,7 +13,7 @@ build
 usage
 -----
     USAGE:
-        git-review-proposal.exe [FLAGS] [OPTIONS] <base> <compare>
+        git-review-suggestion.exe [FLAGS] [OPTIONS] <base> <compare>
 
     FLAGS:
         -h, --help           Prints help information
