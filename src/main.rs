@@ -27,6 +27,10 @@ struct Opt {
     /// Don't display a progress bar
     #[structopt(long)]
     no_progress: bool,
+
+    /// How many lines around each modification to count
+    #[structopt(long, default_value = "3")]
+    context: u32
 }
 
 fn main() -> Result<()> {
@@ -62,7 +66,7 @@ fn main() -> Result<()> {
             DiffOptions::new()
                 .ignore_submodules(true)
                 // 3 lines context (same as default), so we get the authors of the lines around each modification
-                .context_lines(3),
+                .context_lines(opt.context),
         ),
     )?;
     progress.tick();

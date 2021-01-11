@@ -24,11 +24,13 @@ usage
         -v, --verbose        Verbose mode (-v, -vv, -vvv, etc), disables progress reporting
 
     OPTIONS:
+            --context <context>                  How many lines around each modification to count [default: 3]
             --max-blame-size <max-blame-size>    Ignore files larger than this (in bytes) to make things faster [default: 1073741824]
 
     ARGS:
         <base>       Where to merge to
         <compare>    Where to merge from
+
 
 Output will be on lines on the form
 ```
