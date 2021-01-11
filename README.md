@@ -1,6 +1,6 @@
 git-review-suggestion
 ===================
-Tool that proposes which reviewers to pick for a PR based on who have previously authored the lines modified by the PR.
+Tool that suggests which reviewers to pick for a PR based on who have previously authored the lines modified by the PR.
 
 requirements
 ------------
