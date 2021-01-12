@@ -113,7 +113,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "git-review-suggestion"
+name = "git-suggest-reviewers"
 version = "0.1.0"
 dependencies = [
  "anyhow",

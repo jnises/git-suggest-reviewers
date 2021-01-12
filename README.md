@@ -1,4 +1,4 @@
-git-review-suggestion
+git-suggest-reviewers
 ===================
 Tool that suggests which reviewers to pick for a PR based on who have previously authored the lines modified by the PR.
 
@@ -15,7 +15,7 @@ build
 usage
 -----
     USAGE:
-        git-review-suggestion.exe [FLAGS] [OPTIONS] <base> <compare>
+        git-suggest-reviewers.exe [FLAGS] [OPTIONS] <base> <compare>
 
     FLAGS:
         -h, --help           Prints help information
