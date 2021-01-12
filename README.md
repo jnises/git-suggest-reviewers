@@ -24,7 +24,7 @@ usage
         -v, --verbose        Verbose mode (-v, -vv, -vvv, etc), disables progress bar
 
     OPTIONS:
-            --context <context>                  How many lines around each modification to count [default: 3]
+            --context <context>                  How many lines around each modification to count [default: 1]
             --max-blame-size <max-blame-size>    Ignore files larger than this (in bytes) to make things faster [default: 1073741824]
 
     ARGS:

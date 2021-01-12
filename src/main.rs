@@ -29,7 +29,7 @@ struct Opt {
     no_progress: bool,
 
     /// How many lines around each modification to count
-    #[structopt(long, default_value = "3")]
+    #[structopt(long, default_value = "1")]
     context: u32
 }
 
