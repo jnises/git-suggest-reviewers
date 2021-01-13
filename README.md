@@ -2,8 +2,6 @@ git-suggest-reviewers
 ===================
 Tool that suggests which reviewers to pick for a PR based on who have previously authored the lines modified by the PR.
 
-:warning: not very tested, so might eat your laundry.
-
 requirements
 ------------
 rust (https://rustup.rs/)
