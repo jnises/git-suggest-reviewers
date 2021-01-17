@@ -17,8 +17,8 @@ struct Opt {
     compare: String,
 
     /// Ignore files larger than this (in bytes) to make things faster
-    #[structopt(long, default_value = "1073741824")] // 1 MB
-    max_blame_size: u64,
+    #[structopt(long)]
+    max_blame_size: Option<u64>,
 
     /// Verbose mode (-v, -vv, -vvv, etc), disables progress bar
     #[structopt(short, long, parse(from_occurrences))]
@@ -100,8 +100,8 @@ fn main() -> Result<()> {
                         "skipping blame of {:?} because it is binary",
                         delta.old_file().path()
                     );
-                } else if delta.old_file().size() > opt.max_blame_size
-                    || delta.new_file().size() > opt.max_blame_size
+                } else if delta.old_file().size() > opt.max_blame_size.unwrap_or(std::u64::MAX)
+                    || delta.new_file().size() > opt.max_blame_size.unwrap_or(std::u64::MAX)
                 {
                     debug!(
                         "skipping blame of {:?} because it is too large ({})",
