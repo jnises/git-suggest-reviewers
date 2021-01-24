@@ -80,8 +80,8 @@ fn main() -> Result<()> {
         match Patch::from_diff(&diff, deltaidx) {
             Ok(Some(patch)) => {
                 let delta = patch.delta();
-                if let Some(old_path) = delta.old_file().path() {
-                    assert!(delta.old_file().exists());
+                if delta.old_file().exists() {
+                    let old_path = delta.old_file().path().expect("if a file exists it should have a path");
                     if ![FileMode::Blob, FileMode::BlobExecutable]
                         .contains(&delta.old_file().mode())
                     {
