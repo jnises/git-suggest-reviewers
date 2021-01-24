@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use git2::{BlameOptions, DiffFindOptions, DiffOptions, FileMode, Patch, Repository};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, info, warn};
-use std::collections::HashMap;
+use std::{cmp, collections::HashMap};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -138,23 +138,32 @@ fn main() -> Result<()> {
                             } else {
                                 debug!("new new_file for {:?}", old_path);
                             }
-                            match repo.blame_file(
-                                old_path,
-                                Some(
-                                    BlameOptions::new()
-                                        .newest_commit(merge_base)
-                                        .use_mailmap(true)
-                                        // not sure what this one does, but it sounds useful
-                                        .track_copies_same_commit_moves(true),
-                                )
-                                .map(|o| {
-                                    if let Some(commit) = first_commit {
-                                        o.oldest_commit(commit)
-                                    } else {
-                                        o
-                                    }
-                                }),
-                            ) {
+                            let mut min_line = None;
+                            let mut max_line = None;
+                            for hunkidx in 0..patch.num_hunks() {
+                                let (hunk, _) = patch.hunk(hunkidx)?;
+                                min_line = Some(cmp::min(
+                                    min_line.unwrap_or(std::u32::MAX),
+                                    hunk.old_start(),
+                                ));
+                                max_line = Some(cmp::max(
+                                    max_line.unwrap_or(std::u32::MIN),
+                                    hunk.old_start() + hunk.old_lines(),
+                                ));
+                            }
+                            let mut blame_options = BlameOptions::new();
+                            blame_options
+                                .newest_commit(merge_base)
+                                .use_mailmap(true)
+                                // not sure what this one does, but it sounds useful
+                                .track_copies_same_commit_moves(true);
+                            if let (Some(min), Some(max)) = (min_line, max_line) {
+                                blame_options.min_line(min as usize).max_line(max as usize);
+                            }
+                            if let Some(commit) = first_commit {
+                                blame_options.oldest_commit(commit);
+                            }
+                            match repo.blame_file(old_path, Some(&mut blame_options)) {
                                 Ok(blame) => {
                                     for hunkidx in 0..patch.num_hunks() {
                                         let (hunk, _) = patch.hunk(hunkidx)?;

@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
-git2 = "0.13"
+git2 = { git = "https://github.com/jnises/git2-rs.git", branch = "blame-line-options" }
 structopt = "0.3"
 log = "0.4"
 stderrlog = "0.5"
