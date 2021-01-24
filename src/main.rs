@@ -30,7 +30,7 @@ struct Opt {
 
     /// How many lines around each modification to count
     #[structopt(long, default_value = "1")]
-    context: u32
+    context: u32,
 }
 
 fn main() -> Result<()> {
@@ -80,93 +80,94 @@ fn main() -> Result<()> {
         match Patch::from_diff(&diff, deltaidx) {
             Ok(Some(patch)) => {
                 let delta = patch.delta();
-                if !delta.old_file().exists() || !delta.new_file().exists() {
-                    // TODO include all lines from removed file
-                    debug!(
-                        "skipping blame of {:?} because the file was created or deleted",
-                        delta.old_file().path()
-                    );
-                } else if ![FileMode::Blob, FileMode::BlobExecutable]
-                    .contains(&delta.old_file().mode())
-                    || ![FileMode::Blob, FileMode::BlobExecutable]
-                        .contains(&delta.new_file().mode())
-                {
-                    debug!(
-                        "skipping blame of {:?} because it isn't a blob",
-                        delta.old_file().path()
-                    );
-                } else if delta.old_file().is_binary() || delta.new_file().is_binary() {
-                    debug!(
-                        "skipping blame of {:?} because it is binary",
-                        delta.old_file().path()
-                    );
-                } else if delta.old_file().size() > opt.max_blame_size.unwrap_or(std::u64::MAX)
-                    || delta.new_file().size() > opt.max_blame_size.unwrap_or(std::u64::MAX)
-                {
-                    debug!(
-                        "skipping blame of {:?} because it is too large ({})",
-                        delta.old_file().path(),
-                        std::cmp::max(delta.old_file().size(), delta.new_file().size())
-                    );
-                } else {
-                    if let (Some(oldp), Some(newp)) =
-                        (delta.old_file().path(), delta.new_file().path())
+                if let Some(old_path) = delta.old_file().path() {
+                    assert!(delta.old_file().exists());
+                    if ![FileMode::Blob, FileMode::BlobExecutable]
+                        .contains(&delta.old_file().mode())
                     {
-                        if oldp == newp {
-                            info!("processing {:?}", oldp);
+                        debug!("skipping blame of {:?} because it isn't a blob", old_path);
+                    } else if delta.old_file().is_binary() || delta.new_file().is_binary() {
+                        debug!("skipping blame of {:?} because it is binary", old_path);
+                    } else {
+                        let max_size =
+                            std::cmp::max(delta.old_file().size(), delta.new_file().size());
+                        if max_size > opt.max_blame_size.unwrap_or(std::u64::MAX) {
+                            debug!(
+                                "skipping blame of {:?} because it is too large ({})",
+                                old_path, max_size
+                            );
                         } else {
-                            info!("processing {:?} -> {:?}", oldp, newp);
-                        }
-                    }
-                    let path = delta.old_file().path().unwrap(); // unwrap since we have already checked that it exists
-                    match repo.blame_file(
-                        path,
-                        Some(
-                            BlameOptions::new()
-                                .newest_commit(merge_base)
-                                .use_mailmap(true)
-                                // not sure what this one does, but it sounds useful
-                                .track_copies_same_commit_moves(true),
-                        ),
-                    ) {
-                        Ok(blame) => {
-                            for hunkidx in 0..patch.num_hunks() {
-                                let (hunk, _) = patch.hunk(hunkidx)?;
-                                for line in hunk.old_start()..(hunk.old_start() + hunk.old_lines())
-                                {
-                                    if let Some(oldhunk) = blame.get_line(line as usize) {
-                                        let sign = oldhunk.final_signature();
-                                        // !!!!! horrible hack to work around bug in libgit2 (?)
-                                        struct HackSignature {
-                                            raw: *const std::ffi::c_void,
-                                            _owned: bool,
+                            if !delta.new_file().exists() {
+                                info!("processing {:?} -> [deleted]", old_path);
+                            } else if let Some(new_path) = delta.new_file().path() {
+                                if old_path == new_path {
+                                    info!("processing {:?}", old_path);
+                                } else {
+                                    info!("processing {:?} -> {:?}", old_path, new_path);
+                                }
+                            } else {
+                                debug!("new new_file for {:?}", old_path);
+                            }
+                            match repo.blame_file(
+                                old_path,
+                                Some(
+                                    BlameOptions::new()
+                                        .newest_commit(merge_base)
+                                        .use_mailmap(true)
+                                        // not sure what this one does, but it sounds useful
+                                        .track_copies_same_commit_moves(true),
+                                ),
+                            ) {
+                                Ok(blame) => {
+                                    for hunkidx in 0..patch.num_hunks() {
+                                        let (hunk, _) = patch.hunk(hunkidx)?;
+                                        for line in
+                                            hunk.old_start()..(hunk.old_start() + hunk.old_lines())
+                                        {
+                                            if let Some(oldhunk) = blame.get_line(line as usize) {
+                                                let sign = oldhunk.final_signature();
+                                                // !!! hack to work around bug in libgit2 (?)
+                                                struct HackSignature {
+                                                    raw: *const std::ffi::c_void,
+                                                    _owned: bool,
+                                                }
+                                                let signptr: &HackSignature =
+                                                    unsafe { std::mem::transmute(&sign) };
+                                                if signptr.raw.is_null() {
+                                                    warn!("bad signature found in file: {:?}. might be an author without an email or something (bug in libgit2)", old_path);
+                                                } else {
+                                                    let author = (
+                                                        sign.name().map(|s| String::from(s)),
+                                                        sign.email().map(|s| String::from(s)),
+                                                    );
+                                                    modified
+                                                        .entry(author)
+                                                        .and_modify(|e| *e += 1)
+                                                        .or_insert(1);
+                                                }
+                                            } else {
+                                                debug!(
+                                                    "line {} not found in {:?}@{}",
+                                                    line, old_path, merge_base
+                                                );
+                                            }
                                         }
-                                        let signptr: &HackSignature = unsafe { std::mem::transmute(&sign) };
-                                        if signptr.raw.is_null() {
-                                            warn!("bad signature found in file: {:?}. might be an author without an email or something (bug in libgit2)", path);
-                                        } else {
-                                            let author = (
-                                                sign.name().map(|s| String::from(s)),
-                                                sign.email().map(|s| String::from(s)),
-                                            );
-                                            modified
-                                                .entry(author)
-                                                .and_modify(|e| *e += 1)
-                                                .or_insert(1);
-                                        }
-                                    } else {
-                                        debug!(
-                                            "line {} not found in {:?}@{}",
-                                            line, path, merge_base
-                                        );
                                     }
+                                }
+                                Err(e) => {
+                                    debug!("error blaming {:?}: {}", old_path, e);
                                 }
                             }
                         }
-                        Err(e) => {
-                            debug!("error blaming {:?}: {}", path, e);
-                        }
                     }
+                } else {
+                    debug!(
+                        "skipping blame of {:?} because the file was created",
+                        delta
+                            .new_file()
+                            .path()
+                            .map_or("?".into(), |p| p.to_string_lossy())
+                    );
                 }
             }
             Err(e) => {
