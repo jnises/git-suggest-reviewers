@@ -18,7 +18,7 @@ struct Opt {
 
     /// Ignore files larger than this (in bytes) to make things faster
     #[structopt(long)]
-    max_blame_size: Option<u64>,
+    max_file_size: Option<u64>,
 
     /// Verbose mode (-v, -vv, -vvv, etc), disables progress bar
     #[structopt(short, long, parse(from_occurrences))]
@@ -91,7 +91,7 @@ fn main() -> Result<()> {
                     } else {
                         let max_size =
                             std::cmp::max(delta.old_file().size(), delta.new_file().size());
-                        if max_size > opt.max_blame_size.unwrap_or(std::u64::MAX) {
+                        if max_size > opt.max_file_size.unwrap_or(std::u64::MAX) {
                             debug!(
                                 "skipping blame of {:?} because it is too large ({})",
                                 old_path, max_size
