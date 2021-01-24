@@ -67,7 +67,10 @@ fn main() -> Result<()> {
     } else {
         None
     };
-    let compare_tree = repo.find_commit(compare)?.tree()?;
+    let compare_tree = repo
+        .find_commit(compare)
+        .context(format!("{} does not seem to point to a commit", compare))?
+        .tree()?;
     let merge_base = repo
         .merge_base(base, compare)
         .context("unable to find merge base")?;
