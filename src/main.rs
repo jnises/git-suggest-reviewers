@@ -31,6 +31,10 @@ struct Opt {
     /// How many lines around each modification to count
     #[structopt(long, default_value = "1")]
     context: u32,
+
+    /// Don't look further back than this when blaming files
+    #[structopt(long)]
+    first_commit: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -53,10 +57,30 @@ fn main() -> Result<()> {
         .context("unable to find compare")?
         .id();
     info!("compare: {}", compare);
+    let first_commit = if let Some(first_commit) = opt.first_commit {
+        let commit = repo
+            .revparse_single(&first_commit)
+            .context("unable to find first_commit")?
+            .id();
+        info!("first commit: {}", commit);
+        Some(commit)
+    } else {
+        None
+    };
     let compare_tree = repo.find_commit(compare)?.tree()?;
     let merge_base = repo
         .merge_base(base, compare)
         .context("unable to find merge base")?;
+    if let Some(commit) = first_commit {
+        if let Ok(base) = repo.merge_base(merge_base, commit) {
+            if base != commit {
+                warn!(
+                    "first_commit ({}) not an ancestor of {} and {}",
+                    commit, base, compare
+                );
+            }
+        }
+    }
     let merge_base_tree = repo.find_commit(merge_base)?.tree()?;
     info!("merge base: {:?}", merge_base);
     let mut diff = repo.diff_tree_to_tree(
@@ -81,7 +105,10 @@ fn main() -> Result<()> {
             Ok(Some(patch)) => {
                 let delta = patch.delta();
                 if delta.old_file().exists() {
-                    let old_path = delta.old_file().path().expect("if a file exists it should have a path");
+                    let old_path = delta
+                        .old_file()
+                        .path()
+                        .expect("if a file exists it should have a path");
                     if ![FileMode::Blob, FileMode::BlobExecutable]
                         .contains(&delta.old_file().mode())
                     {
@@ -116,7 +143,14 @@ fn main() -> Result<()> {
                                         .use_mailmap(true)
                                         // not sure what this one does, but it sounds useful
                                         .track_copies_same_commit_moves(true),
-                                ),
+                                )
+                                .map(|o| {
+                                    if let Some(commit) = first_commit {
+                                        o.oldest_commit(commit)
+                                    } else {
+                                        o
+                                    }
+                                }),
                             ) {
                                 Ok(blame) => {
                                     for hunkidx in 0..patch.num_hunks() {
