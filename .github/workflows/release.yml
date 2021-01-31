@@ -43,13 +43,13 @@ jobs:
     - uses: actions/download-artifact@v2
       with:
         name: git-suggest-reviewers_mac_x64.zip
-        path: git-suggest-reviewers_mac_x64.zip
     - uses: actions/download-artifact@v2
       with:
         name: git-suggest-reviewers_win_x64.exe
-        path: git-suggest-reviewers.exe
     # zip the win build here.
-    - run: zip git-suggest-reviewers_win_x64.zip git-suggest-reviewers.exe
+    - run: |
+        mv git-suggest-reviewers_win_x64.exe git-suggest-reviewers.exe
+        zip git-suggest-reviewers_win_x64.zip git-suggest-reviewers.exe
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
