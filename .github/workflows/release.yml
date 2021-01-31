@@ -1,0 +1,27 @@
+name: Release
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: windows-2019
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --release
+    - uses: actions/upload-artifact@v2
+      with:
+        name: win_x64/git-suggest-reviewers.exe
+        path: target/release/git-suggest-reviewers.exe
+
+  build:
+    runs-on: macos-11.0
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build
+    - uses: actions/upload-artifact@v2
+      with:
+        name: mac_x64/git-suggest-reviewers
+        path: target/release/git-suggest-reviewers
+        
