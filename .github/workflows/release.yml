@@ -28,7 +28,7 @@ jobs:
       with:
         toolchain: stable
     - name: Build
-      run: cargo build
+      run: cargo build --release
     - uses: actions/upload-artifact@v2
       with:
         name: git-suggest-reviewers_mac_x64
