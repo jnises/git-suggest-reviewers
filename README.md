@@ -13,7 +13,7 @@ build
 usage
 -----
     USAGE:
-        git-suggest-reviewers.exe [FLAGS] [OPTIONS] <base> <compare>
+        git-suggest-reviewers [FLAGS] [OPTIONS] <base> <compare>
 
     FLAGS:
         -h, --help           Prints help information
@@ -22,8 +22,9 @@ usage
         -v, --verbose        Verbose mode (-v, -vv, -vvv, etc), disables progress bar
 
     OPTIONS:
-            --context <context>                  How many lines around each modification to count [default: 1]
-            --max-blame-size <max-blame-size>    Ignore files larger than this (in bytes) to make things faster [default: 1073741824]
+            --context <context>                How many lines around each modification to count [default: 1]
+            --first-commit <first-commit>      Don't look further back than this when blaming files
+            --max-file-size <max-file-size>    Ignore files larger than this (in bytes) to make things faster
 
     ARGS:
         <base>       Where to merge to
