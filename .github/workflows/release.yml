@@ -14,11 +14,13 @@ jobs:
       with:
         toolchain: stable
     - name: Build
-      run: cargo build --release
+      run: |
+        cargo build --release
+        mv target/release/git-suggest-reviewers.exe git-suggest-reviewers_win_x64.exe
     - uses: actions/upload-artifact@v2
       with:
         name: git-suggest-reviewers_win_x64.exe
-        path: target/release/git-suggest-reviewers.exe
+        path: git-suggest-reviewers_win_x64.exe
 
   mac_build:
     runs-on: macos-10.15
@@ -48,7 +50,6 @@ jobs:
         name: git-suggest-reviewers_win_x64.exe
     # zip the win build here.
     - run: |
-        ls -Flahtr
         mv git-suggest-reviewers_win_x64.exe git-suggest-reviewers.exe
         zip git-suggest-reviewers_win_x64.zip git-suggest-reviewers.exe
     - name: Create Release
