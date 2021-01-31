@@ -48,6 +48,7 @@ jobs:
         name: git-suggest-reviewers_win_x64.exe
     # zip the win build here.
     - run: |
+        ls -Flahtr
         mv git-suggest-reviewers_win_x64.exe git-suggest-reviewers.exe
         zip git-suggest-reviewers_win_x64.zip git-suggest-reviewers.exe
     - name: Create Release
