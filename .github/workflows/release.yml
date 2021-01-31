@@ -3,7 +3,7 @@ name: Release
 on: workflow_dispatch
 
 jobs:
-  build:
+  win_build:
     runs-on: windows-2019
     steps:
     - uses: actions/checkout@v2
@@ -14,7 +14,7 @@ jobs:
         name: win_x64/git-suggest-reviewers.exe
         path: target/release/git-suggest-reviewers.exe
 
-  build:
+  mac_build:
     runs-on: macos-11.0
     steps:
     - uses: actions/checkout@v2
@@ -24,4 +24,4 @@ jobs:
       with:
         name: mac_x64/git-suggest-reviewers
         path: target/release/git-suggest-reviewers
-        
+
