@@ -17,7 +17,7 @@ jobs:
       run: cargo build --release
     - uses: actions/upload-artifact@v2
       with:
-        name: git-suggest-reviewers_win_x64
+        name: git-suggest-reviewers_win_x64.exe
         path: target/release/git-suggest-reviewers.exe
 
   mac_build:
@@ -30,12 +30,11 @@ jobs:
     - name: Build
       run: |
         cargo build --release
-        cd target/release
-        tar cz git-suggest-reviewers > ../../git-suggest-reviewers_mac_x64.tgz
+        ditto -c -k --sequesterRsrc target/release/git-suggest-reviewers git-suggest-reviewers_mac_x64.zip
     - uses: actions/upload-artifact@v2
       with:
-        name: git-suggest-reviewers_mac_x64
-        path: target/release/git-suggest-reviewers
+        name: git-suggest-reviewers_mac_x64.zip
+        path: git-suggest-reviewers_mac_x64.zip
 
   release:
     needs: [win_build, mac_build]
@@ -43,12 +42,14 @@ jobs:
     steps:
     - uses: actions/download-artifact@v2
       with:
-        name: git-suggest-reviewers_mac_x64
-        path: mac_x64/git-suggest-reviewers
+        name: git-suggest-reviewers_mac_x64.zip
+        path: git-suggest-reviewers_mac_x64.zip
     - uses: actions/download-artifact@v2
       with:
-        name: git-suggest-reviewers_win_x64
-        path: win_x64/git-suggest-reviewers
+        name: git-suggest-reviewers_win_x64.exe
+        path: git-suggest-reviewers.exe
+    # zip the win build here.
+    - run: zip git-suggest-reviewers_win_x64.zip git-suggest-reviewers.exe
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
@@ -64,14 +65,14 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: ./git-suggest-reviewers_mac_x64
-        asset_name: mac_x64/git-suggest-reviewers
-        asset_content_type: application/octet-stream
+        asset_path: ./git-suggest-reviewers_mac_x64.zip
+        asset_name: git-suggest-reviewers_mac_x64.zip
+        asset_content_type: application/zip
     - uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: ./git-suggest-reviewers_win_x64
-        assert_name: win_x64/git-suggest-reviewers.exe
-        asset_content_type: application/octet-stream
+        asset_path: ./git-suggest-reviewers_win_x64.zip
+        assert_name: git-suggest-reviewers_win_x64.zip
+        asset_content_type: application/zip
