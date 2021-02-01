@@ -42,4 +42,3 @@ sorted by the number of lines authored by that developer.
 known issues
 ------------
 Built using libgit2, so only supports repos that that library can handle.  
-Does not count removed files.
