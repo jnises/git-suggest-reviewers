@@ -115,7 +115,6 @@ fn main() -> Result<()> {
     let max_file_size = opt.max_file_size;
     type ModifiedMap = HashMap<(Option<String>, Option<String>), usize>;
     let modified = (0..num_deltas).into_par_iter().map(|deltaidx| -> Result<ModifiedMap> {
-        progress.inc(1);
         let mut modified: ModifiedMap = HashMap::new();
         // TODO keep a pool of repos?
         let repo = get_repo()?;        
@@ -236,6 +235,7 @@ fn main() -> Result<()> {
             }
             Ok(None) => {}
         }
+        progress.inc(1);
         Ok(modified)
     }).try_reduce(|| HashMap::new(), |mut acc, modified| {
         for (k, v) in modified.iter() {
