@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
-use git2::{BlameOptions, DiffFindOptions, DiffOptions, FileMode, Patch, Repository};
+use git2::{BlameOptions, DiffFindOptions, DiffOptions, FileMode, Patch, Repository, Diff, Oid};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, info, warn};
 use std::{cmp, collections::HashMap};
 use structopt::StructOpt;
+use rayon::prelude::*;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -35,17 +36,40 @@ struct Opt {
     /// Don't look further back than this when blaming files
     #[structopt(long)]
     first_commit: Option<String>,
+
+    // Maximum number of threads. 0 is auto.
+    #[structopt(long, short = "j", default_value = "0")]
+    max_concurrency: usize,
+}
+
+fn get_repo() -> Result<Repository> {
+    Ok(Repository::discover(".")?)
+}
+
+fn get_diff<'a>(repo: &'a Repository, base: Oid, compare: Oid, context: u32) -> Result<Diff<'a>> {
+    let mut diff = repo.diff_tree_to_tree(
+        Some(&repo.find_commit(base)?.tree()?),
+        Some(&repo.find_commit(compare)?.tree()?),
+        Some(
+            DiffOptions::new()
+                .ignore_submodules(true)
+                .context_lines(context),
+        ),
+    )?;
+    diff.find_similar(Some(DiffFindOptions::new().by_config()))?;
+    Ok(diff)
 }
 
 fn main() -> Result<()> {
     let opt = Opt::from_args();
     stderrlog::new().verbosity(opt.verbose).init()?;
+    rayon::ThreadPoolBuilder::new().num_threads(opt.max_concurrency).build_global()?;
     let progress = if opt.no_progress || opt.verbose > 0 {
         ProgressBar::hidden()
     } else {
         ProgressBar::new_spinner()
     };
-    let repo = Repository::discover(".")?;
+    let repo = get_repo()?;
     progress.tick();
     let base = repo
         .revparse_single(&opt.base)
@@ -67,10 +91,6 @@ fn main() -> Result<()> {
     } else {
         None
     };
-    let compare_tree = repo
-        .find_commit(compare)
-        .context(format!("{} does not seem to point to a commit", compare))?
-        .tree()?;
     let merge_base = repo
         .merge_base(base, compare)
         .context("unable to find merge base")?;
@@ -84,27 +104,22 @@ fn main() -> Result<()> {
             }
         }
     }
-    let merge_base_tree = repo.find_commit(merge_base)?.tree()?;
     info!("merge base: {:?}", merge_base);
-    let mut diff = repo.diff_tree_to_tree(
-        Some(&merge_base_tree),
-        Some(&compare_tree),
-        Some(
-            DiffOptions::new()
-                .ignore_submodules(true)
-                .context_lines(opt.context),
-        ),
-    )?;
+    let diff = get_diff(&repo, merge_base, compare, opt.context).context("error calculating diff")?;
     progress.tick();
-    diff.find_similar(Some(DiffFindOptions::new().by_config()))?;
     progress.tick();
-    let mut modified: HashMap<(Option<String>, Option<String>), usize> = HashMap::new();
     let num_deltas = diff.deltas().len();
     progress.set_style(ProgressStyle::default_bar());
     progress.set_length(num_deltas as u64);
-    for deltaidx in 0..num_deltas {
-        progress.set_position(deltaidx as u64);
-        match Patch::from_diff(&diff, deltaidx) {
+    let context = opt.context;
+    let max_file_size = opt.max_file_size;
+    type ModifiedMap = HashMap<(Option<String>, Option<String>), usize>;
+    let modified = (0..num_deltas).into_par_iter().map(|deltaidx| -> Result<ModifiedMap> {
+        progress.inc(1);
+        let mut modified: ModifiedMap = HashMap::new();
+        // TODO keep a pool of repos?
+        let repo = get_repo()?;        
+        match Patch::from_diff(&get_diff(&repo, merge_base, compare, context)?, deltaidx) {
             Ok(Some(patch)) => {
                 let delta = patch.delta();
                 if delta.old_file().exists() {
@@ -121,7 +136,7 @@ fn main() -> Result<()> {
                     } else {
                         let max_size =
                             std::cmp::max(delta.old_file().size(), delta.new_file().size());
-                        if max_size > opt.max_file_size.unwrap_or(std::u64::MAX) {
+                        if max_size > max_file_size.unwrap_or(std::u64::MAX) {
                             debug!(
                                 "skipping blame of {:?} because it is too large ({})",
                                 old_path, max_size
@@ -221,7 +236,13 @@ fn main() -> Result<()> {
             }
             Ok(None) => {}
         }
-    }
+        Ok(modified)
+    }).try_reduce(|| HashMap::new(), |mut acc, modified| {
+        for (k, v) in modified.iter() {
+            *acc.entry(k.clone()).or_insert(0) += v;
+        }
+        Ok(acc)
+    })?;
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
     // reversed
     modified_sorted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
