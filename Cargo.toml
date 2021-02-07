@@ -18,3 +18,4 @@ git = "https://github.com/rust-lang/git2-rs.git"
 # using specific commit until the blame min max line commit has been released
 rev = "1b9ebc6457d75ea9101ae3b568319bab50173631"
 default-features = false
+features = ["zlib-ng-compat"]
