@@ -12,6 +12,7 @@ jobs:
     - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
+        profile: minimal
         toolchain: stable
     - name: Build
       run: |
@@ -28,10 +29,12 @@ jobs:
     - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
+        profile: minimal
         toolchain: stable
     - name: Build
       run: |
         cargo build --release
+        strip -S target/release/git-suggest-reviewers
         ditto -c -k --sequesterRsrc target/release/git-suggest-reviewers git-suggest-reviewers_mac_x64.zip
     - uses: actions/upload-artifact@v2
       with:
