@@ -3,81 +3,104 @@ name: Release
 on:
   push:
     tags:
-    - 'v*'
+      - "v*"
 
 jobs:
   win_build:
     runs-on: windows-2019
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - name: Build
-      run: |
-        cargo build --release
-        mv target/release/git-suggest-reviewers.exe git-suggest-reviewers_win_x64.exe
-    - uses: actions/upload-artifact@v2
-      with:
-        name: git-suggest-reviewers_win_x64.exe
-        path: git-suggest-reviewers_win_x64.exe
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Build
+        run: |
+          cargo build --release
+          mv target/release/git-suggest-reviewers.exe git-suggest-reviewers_win_x64.exe
+      - uses: actions/upload-artifact@v2
+        with:
+          name: git-suggest-reviewers_win_x64.exe
+          path: git-suggest-reviewers_win_x64.exe
 
   mac_build:
     runs-on: macos-10.15
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - name: Build
-      run: |
-        cargo build --release
-        strip -S target/release/git-suggest-reviewers
-        ditto -c -k --sequesterRsrc target/release/git-suggest-reviewers git-suggest-reviewers_mac_x64.zip
-    - uses: actions/upload-artifact@v2
-      with:
-        name: git-suggest-reviewers_mac_x64.zip
-        path: git-suggest-reviewers_mac_x64.zip
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: aarch64-apple-darwin
+      - name: Build x86
+        run: |
+          cargo build --release
+          strip -S target/release/git-suggest-reviewers
+          ditto -c -k --sequesterRsrc target/release/git-suggest-reviewers git-suggest-reviewers_mac_x64.zip
+      - uses: actions/upload-artifact@v2
+        with:
+          name: git-suggest-reviewers_mac_x64.zip
+          path: git-suggest-reviewers_mac_x64.zip
+      - name: clean
+        run: cargo clean
+      - name: Build aarch64
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          strip -S target/release/git-suggest-reviewers
+          ditto -c -k --sequesterRsrc target/release/git-suggest-reviewers git-suggest-reviewers_mac_aarch64.zip
+      - uses: actions/upload-artifact@v2
+        with:
+          name: git-suggest-reviewers_mac_aarch64.zip
+          path: git-suggest-reviewers_mac_aarch64.zip          
 
   release:
     needs: [win_build, mac_build]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/download-artifact@v2
-      with:
-        name: git-suggest-reviewers_mac_x64.zip
-    - uses: actions/download-artifact@v2
-      with:
-        name: git-suggest-reviewers_win_x64.exe
-    # zip the win build here.
-    - run: |
-        mv git-suggest-reviewers_win_x64.exe git-suggest-reviewers.exe
-        zip git-suggest-reviewers_win_x64.zip git-suggest-reviewers.exe
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
-    - uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: ./git-suggest-reviewers_mac_x64.zip
-        asset_name: git-suggest-reviewers_mac_x64.zip
-        asset_content_type: application/zip
-    - uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: ./git-suggest-reviewers_win_x64.zip
-        asset_name: git-suggest-reviewers_win_x64.zip
-        asset_content_type: application/zip
+      - uses: actions/download-artifact@v2
+        with:
+          name: git-suggest-reviewers_mac_x64.zip
+      - uses: actions/download-artifact@v2
+        with:
+          name: git-suggest-reviewers_win_x64.exe
+      - uses: actions/download-artifact@v2
+        with:
+          name: git-suggest-reviewers_win_aarch64.exe          
+      # zip the win build here.
+      - run: |
+          mv git-suggest-reviewers_win_x64.exe git-suggest-reviewers.exe
+          zip git-suggest-reviewers_win_x64.zip git-suggest-reviewers.exe
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          asset_path: ./git-suggest-reviewers_mac_x64.zip
+          asset_name: git-suggest-reviewers_mac_x64.zip
+          asset_content_type: application/zip
+      - uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          asset_path: ./git-suggest-reviewers_mac_aarch64.zip
+          asset_name: git-suggest-reviewers_mac_aarch64.zip
+          asset_content_type: application/zip          
+      - uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          asset_path: ./git-suggest-reviewers_win_x64.zip
+          asset_name: git-suggest-reviewers_win_x64.zip
+          asset_content_type: application/zip
