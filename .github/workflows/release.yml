@@ -34,7 +34,7 @@ jobs:
           target: aarch64-apple-darwin
       - name: Build x86
         run: |
-          cargo build --release
+          cargo build --release --target x86_64-apple-darwin
           strip -S target/release/git-suggest-reviewers
           ditto -c -k --sequesterRsrc target/release/git-suggest-reviewers git-suggest-reviewers_mac_x64.zip
       - uses: actions/upload-artifact@v2
