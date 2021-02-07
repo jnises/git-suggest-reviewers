@@ -14,8 +14,8 @@ stderrlog = "0.5"
 indicatif = "0.15"
 
 [dependencies.git2]
-# use our own fork to get blame min max line, and no ssh in libz-ng
-git = "https://github.com/jnises/git2-rs.git"
-rev = "383de230bbe221b4d54859a726b0a23da046e2f5"
+git = "https://github.com/rust-lang/git2-rs.git"
+# using specific commit until the blame min max line commit has been released
+rev = "1b9ebc6457d75ea9101ae3b568319bab50173631"
 default-features = false
 features = ["zlib-ng-compat"]
