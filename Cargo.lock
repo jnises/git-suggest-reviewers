@@ -136,7 +136,7 @@ dependencies = [
 [[package]]
 name = "git2"
 version = "0.13.17"
-source = "git+https://github.com/rust-lang/git2-rs.git?rev=1b9ebc6457d75ea9101ae3b568319bab50173631#1b9ebc6457d75ea9101ae3b568319bab50173631"
+source = "git+https://github.com/jnises/git2-rs.git?rev=383de230bbe221b4d54859a726b0a23da046e2f5#383de230bbe221b4d54859a726b0a23da046e2f5"
 dependencies = [
  "bitflags",
  "libc",
@@ -165,9 +165,9 @@ dependencies = [
 
 [[package]]
 name = "idna"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02e2673c30ee86b5b96a9cb52ad15718aa1f966f5ab9ad54a8b95d5ca33120a9"
+checksum = "de910d521f7cc3135c4de8db1cb910e0b5ed1dc6f57c381cd07e8e661ce10094"
 dependencies = [
  "matches",
  "unicode-bidi",
@@ -203,34 +203,19 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.84"
+version = "0.2.85"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cca32fa0182e8c0989459524dc356b8f2b5c10f1b9eb521b7d182c03cf8c5ff"
+checksum = "7ccac4b00700875e6a07c6cde370d44d32fa01c5a65cdd2fca6858c479d28bb3"
 
 [[package]]
 name = "libgit2-sys"
 version = "0.12.18+1.1.0"
-source = "git+https://github.com/rust-lang/git2-rs.git?rev=1b9ebc6457d75ea9101ae3b568319bab50173631#1b9ebc6457d75ea9101ae3b568319bab50173631"
-dependencies = [
- "cc",
- "libc",
- "libssh2-sys",
- "libz-sys",
- "pkg-config",
-]
-
-[[package]]
-name = "libssh2-sys"
-version = "0.2.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0186af0d8f171ae6b9c4c90ec51898bad5d08a2d5e470903a50d9ad8959cbee"
+source = "git+https://github.com/jnises/git2-rs.git?rev=383de230bbe221b4d54859a726b0a23da046e2f5#383de230bbe221b4d54859a726b0a23da046e2f5"
 dependencies = [
  "cc",
  "libc",
  "libz-sys",
- "openssl-sys",
  "pkg-config",
- "vcpkg",
 ]
 
 [[package]]
@@ -285,19 +270,6 @@ name = "number_prefix"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17b02fc0ff9a9e4b35b3342880f48e896ebf69f2967921fe8646bf5b7125956a"
-
-[[package]]
-name = "openssl-sys"
-version = "0.9.60"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "921fc71883267538946025deffb622905ecad223c28efbfdef9bb59a0175f3e6"
-dependencies = [
- "autocfg",
- "cc",
- "libc",
- "pkg-config",
- "vcpkg",
-]
 
 [[package]]
 name = "percent-encoding"
