@@ -5,6 +5,7 @@ use log::{debug, info, warn};
 use std::{cmp, collections::HashMap};
 use structopt::StructOpt;
 use rayon::prelude::*;
+use thread_local::ThreadLocal;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -114,11 +115,13 @@ fn main() -> Result<()> {
     let context = opt.context;
     let max_file_size = opt.max_file_size;
     type ModifiedMap = HashMap<(Option<String>, Option<String>), usize>;
+    let repo_tls: ThreadLocal<Repository> = ThreadLocal::new();
+    let diff_tls: ThreadLocal<Diff> = ThreadLocal::new();
     let modified = (0..num_deltas).into_par_iter().map(|deltaidx| -> Result<ModifiedMap> {
         let mut modified: ModifiedMap = HashMap::new();
-        // TODO keep a pool of repos?
-        let repo = get_repo()?;        
-        match Patch::from_diff(&get_diff(&repo, merge_base, compare, context)?, deltaidx) {
+        let repo = repo_tls.get_or_try(|| get_repo())?;
+        let diff = diff_tls.get_or_try(|| get_diff(&repo, merge_base, compare, context))?;
+        match Patch::from_diff(&diff, deltaidx) {
             Ok(Some(patch)) => {
                 let delta = patch.delta();
                 if delta.old_file().exists() {
@@ -243,6 +246,8 @@ fn main() -> Result<()> {
         }
         Ok(acc)
     })?;
+    drop(diff_tls);
+    drop(repo_tls);
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
     // reversed
     modified_sorted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
