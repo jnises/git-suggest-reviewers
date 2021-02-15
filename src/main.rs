@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
-use git2::{BlameOptions, DiffFindOptions, DiffOptions, FileMode, Patch, Repository, Diff, Oid};
+use git2::{BlameOptions, Diff, DiffFindOptions, DiffOptions, FileMode, Oid, Patch, Repository};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, info, warn};
+use rayon::prelude::*;
 use std::{cmp, collections::HashMap};
 use structopt::StructOpt;
-use rayon::prelude::*;
 use thread_local::ThreadLocal;
 
 #[derive(Debug, StructOpt)]
@@ -64,7 +64,9 @@ fn get_diff<'a>(repo: &'a Repository, base: Oid, compare: Oid, context: u32) -> 
 fn main() -> Result<()> {
     let opt = Opt::from_args();
     stderrlog::new().verbosity(opt.verbose).init()?;
-    rayon::ThreadPoolBuilder::new().num_threads(opt.max_concurrency).build_global()?;
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(opt.max_concurrency)
+        .build_global()?;
     let progress = if opt.no_progress || opt.verbose > 0 {
         ProgressBar::hidden()
     } else {
@@ -106,7 +108,8 @@ fn main() -> Result<()> {
         }
     }
     info!("merge base: {:?}", merge_base);
-    let diff = get_diff(&repo, merge_base, compare, opt.context).context("error calculating diff")?;
+    let diff =
+        get_diff(&repo, merge_base, compare, opt.context).context("error calculating diff")?;
     progress.tick();
     progress.tick();
     let num_deltas = diff.deltas().len();
