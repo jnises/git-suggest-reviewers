@@ -1,3 +1,4 @@
+// #![warn(missing_debug_implementations, rust_2018_idoms)]
 use anyhow::{Context, Result};
 use git2::{BlameOptions, Diff, DiffFindOptions, DiffOptions, FileMode, Oid, Patch, Repository};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -120,6 +121,7 @@ fn main() -> Result<()> {
     type ModifiedMap = HashMap<(Option<String>, Option<String>), usize>;
     let repo_tls: ThreadLocal<Repository> = ThreadLocal::new();
     let diff_tls: ThreadLocal<Diff> = ThreadLocal::new();
+    //let oldest_tls: ThreadLocal<HashMap> = ThreadLocal::new();
     let modified = (0..num_deltas).into_par_iter().map(|deltaidx| -> Result<ModifiedMap> {
         let mut modified: ModifiedMap = HashMap::new();
         let repo = repo_tls.get_or_try(|| get_repo())?;
@@ -176,7 +178,8 @@ fn main() -> Result<()> {
                                 .newest_commit(merge_base)
                                 .use_mailmap(true)
                                 // not sure what this one does, but it sounds useful
-                                .track_copies_same_commit_moves(true);
+                                //.track_copies_same_commit_moves(true);
+                                ;
                             if let (Some(min), Some(max)) = (min_line, max_line) {
                                 blame_options.min_line(min as usize).max_line(max as usize);
                             }
@@ -249,6 +252,7 @@ fn main() -> Result<()> {
         }
         Ok(acc)
     })?;
+    //drop(oldest_tls);
     drop(diff_tls);
     drop(repo_tls);
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
