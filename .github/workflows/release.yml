@@ -62,7 +62,7 @@ jobs:
           name: git-suggest-reviewers_mac_x64.zip
       - uses: actions/download-artifact@v2
         with:
-          name: git-suggest-reviewers_win_aarch64.zip        
+          name: git-suggest-reviewers_mac_aarch64.zip        
       - uses: actions/download-artifact@v2
         with:
           name: git-suggest-reviewers_win_x64.exe
