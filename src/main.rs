@@ -121,7 +121,6 @@ fn main() -> Result<()> {
     type ModifiedMap = HashMap<(Option<String>, Option<String>), usize>;
     let repo_tls: ThreadLocal<Repository> = ThreadLocal::new();
     let diff_tls: ThreadLocal<Diff> = ThreadLocal::new();
-    //let oldest_tls: ThreadLocal<HashMap> = ThreadLocal::new();
     let modified = (0..num_deltas).into_par_iter().map(|deltaidx| -> Result<ModifiedMap> {
         let mut modified: ModifiedMap = HashMap::new();
         let repo = repo_tls.get_or_try(|| get_repo())?;
@@ -252,7 +251,6 @@ fn main() -> Result<()> {
         }
         Ok(acc)
     })?;
-    //drop(oldest_tls);
     drop(diff_tls);
     drop(repo_tls);
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
