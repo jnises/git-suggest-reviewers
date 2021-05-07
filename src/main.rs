@@ -48,7 +48,7 @@ fn get_repo() -> Result<Repository> {
     Ok(Repository::discover(".")?)
 }
 
-fn get_diff<'a>(repo: &'a Repository, base: Oid, compare: Oid, context: u32) -> Result<Diff<'a>> {
+fn get_diff(repo: &Repository, base: Oid, compare: Oid, context: u32) -> Result<Diff<'_>> {
     let mut diff = repo.diff_tree_to_tree(
         Some(&repo.find_commit(base)?.tree()?),
         Some(&repo.find_commit(compare)?.tree()?),
@@ -123,7 +123,7 @@ fn main() -> Result<()> {
     let diff_tls: ThreadLocal<Diff> = ThreadLocal::new();
     let modified = (0..num_deltas).into_par_iter().map(|deltaidx| -> Result<ModifiedMap> {
         let mut modified: ModifiedMap = HashMap::new();
-        let repo = repo_tls.get_or_try(|| get_repo())?;
+        let repo = repo_tls.get_or_try(get_repo)?;
         let diff = diff_tls.get_or_try(|| get_diff(&repo, merge_base, compare, context))?;
         match Patch::from_diff(&diff, deltaidx) {
             Ok(Some(patch)) => {
@@ -245,7 +245,7 @@ fn main() -> Result<()> {
         }
         progress.inc(1);
         Ok(modified)
-    }).try_reduce(|| HashMap::new(), |mut acc, modified| {
+    }).try_reduce(HashMap::new, |mut acc, modified| {
         for (k, v) in modified.iter() {
             *acc.entry(k.clone()).or_insert(0) += v;
         }
