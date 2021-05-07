@@ -1,4 +1,4 @@
-// #![warn(missing_debug_implementations, rust_2018_idoms)]
+// #![warn(missing_debug_implementations, rust_2018_idoms, clippy:all)]
 use anyhow::{Context, Result};
 use git2::{BlameOptions, Diff, DiffFindOptions, DiffOptions, FileMode, Oid, Patch, Repository};
 use indicatif::{ProgressBar, ProgressStyle};
