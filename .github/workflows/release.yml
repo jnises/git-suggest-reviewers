@@ -42,17 +42,16 @@ jobs:
         with:
           name: git-suggest-reviewers_mac_x64.zip
           path: git-suggest-reviewers_mac_x64.zip
-      # TODO enable this when it starts working. or just add another job once github actions starts providing apple silicon runners
-      # - name: Build aarch64
-      #   run: |
-      #     cargo build --release --target aarch64-apple-darwin
-      #     ARTIFACT="target/aarch64-apple-darwin/release/git-suggest-reviewers"
-      #     strip -S "$ARTIFACT"
-      #     ditto -c -k --sequesterRsrc "$ARTIFACT" git-suggest-reviewers_mac_aarch64.zip
-      # - uses: actions/upload-artifact@v2
-      #   with:
-      #     name: git-suggest-reviewers_mac_aarch64.zip
-      #     path: git-suggest-reviewers_mac_aarch64.zip          
+      - name: Build aarch64
+        run: |
+          SDKROOT=$(xcrun -sdk macosx11.1 --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx11.1 --show-sdk-platform-version) cargo build --release --target aarch64-apple-darwin
+          ARTIFACT="target/aarch64-apple-darwin/release/git-suggest-reviewers"
+          strip -S "$ARTIFACT"
+          ditto -c -k --sequesterRsrc "$ARTIFACT" git-suggest-reviewers_mac_aarch64.zip
+      - uses: actions/upload-artifact@v2
+        with:
+          name: git-suggest-reviewers_mac_aarch64.zip
+          path: git-suggest-reviewers_mac_aarch64.zip          
 
   release:
     needs: [win_build, mac_build]
@@ -61,10 +60,9 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: git-suggest-reviewers_mac_x64.zip
-      # TODO enable once there's support
-      # - uses: actions/download-artifact@v2
-      #   with:
-      #     name: git-suggest-reviewers_win_aarch64.zip        
+      - uses: actions/download-artifact@v2
+        with:
+          name: git-suggest-reviewers_mac_aarch64.zip        
       - uses: actions/download-artifact@v2
         with:
           name: git-suggest-reviewers_win_x64.exe

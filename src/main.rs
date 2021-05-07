@@ -1,10 +1,12 @@
+// #![warn(missing_debug_implementations, rust_2018_idoms)]
 use anyhow::{Context, Result};
-use git2::{BlameOptions, DiffFindOptions, DiffOptions, FileMode, Patch, Repository, Diff, Oid};
+use git2::{BlameOptions, Diff, DiffFindOptions, DiffOptions, FileMode, Oid, Patch, Repository};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, info, warn};
+use rayon::prelude::*;
 use std::{cmp, collections::HashMap};
 use structopt::StructOpt;
-use rayon::prelude::*;
+use thread_local::ThreadLocal;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -63,7 +65,9 @@ fn get_diff<'a>(repo: &'a Repository, base: Oid, compare: Oid, context: u32) -> 
 fn main() -> Result<()> {
     let opt = Opt::from_args();
     stderrlog::new().verbosity(opt.verbose).init()?;
-    rayon::ThreadPoolBuilder::new().num_threads(opt.max_concurrency).build_global()?;
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(opt.max_concurrency)
+        .build_global()?;
     let progress = if opt.no_progress || opt.verbose > 0 {
         ProgressBar::hidden()
     } else {
@@ -105,7 +109,8 @@ fn main() -> Result<()> {
         }
     }
     info!("merge base: {:?}", merge_base);
-    let diff = get_diff(&repo, merge_base, compare, opt.context).context("error calculating diff")?;
+    let diff =
+        get_diff(&repo, merge_base, compare, opt.context).context("error calculating diff")?;
     progress.tick();
     progress.tick();
     let num_deltas = diff.deltas().len();
@@ -114,11 +119,13 @@ fn main() -> Result<()> {
     let context = opt.context;
     let max_file_size = opt.max_file_size;
     type ModifiedMap = HashMap<(Option<String>, Option<String>), usize>;
+    let repo_tls: ThreadLocal<Repository> = ThreadLocal::new();
+    let diff_tls: ThreadLocal<Diff> = ThreadLocal::new();
     let modified = (0..num_deltas).into_par_iter().map(|deltaidx| -> Result<ModifiedMap> {
         let mut modified: ModifiedMap = HashMap::new();
-        // TODO keep a pool of repos?
-        let repo = get_repo()?;        
-        match Patch::from_diff(&get_diff(&repo, merge_base, compare, context)?, deltaidx) {
+        let repo = repo_tls.get_or_try(|| get_repo())?;
+        let diff = diff_tls.get_or_try(|| get_diff(&repo, merge_base, compare, context))?;
+        match Patch::from_diff(&diff, deltaidx) {
             Ok(Some(patch)) => {
                 let delta = patch.delta();
                 if delta.old_file().exists() {
@@ -170,7 +177,8 @@ fn main() -> Result<()> {
                                 .newest_commit(merge_base)
                                 .use_mailmap(true)
                                 // not sure what this one does, but it sounds useful
-                                .track_copies_same_commit_moves(true);
+                                //.track_copies_same_commit_moves(true);
+                                ;
                             if let (Some(min), Some(max)) = (min_line, max_line) {
                                 blame_options.min_line(min as usize).max_line(max as usize);
                             }
@@ -243,6 +251,8 @@ fn main() -> Result<()> {
         }
         Ok(acc)
     })?;
+    drop(diff_tls);
+    drop(repo_tls);
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
     // reversed
     modified_sorted.sort_unstable_by(|a, b| b.1.cmp(&a.1));

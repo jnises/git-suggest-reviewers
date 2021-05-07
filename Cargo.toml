@@ -1,6 +1,6 @@
 [package]
 name = "git-suggest-reviewers"
-version = "1.3.0"
+version = "1.3.1"
 authors = ["Joel Nises <joel.nises@gmail.com>"]
 edition = "2018"
 
@@ -11,11 +11,7 @@ anyhow = "1.0"
 structopt = "0.3"
 log = "0.4"
 stderrlog = "0.5"
-indicatif = "0.15"
+indicatif = "0.16"
 rayon = "1.5"
-
-[dependencies.git2]
-git = "https://github.com/rust-lang/git2-rs.git"
-# using specific commit until the blame min max line commit has been released
-rev = "1b9ebc6457d75ea9101ae3b568319bab50173631"
-default-features = false
+thread_local = "1.0"
+git2 = { version = "0.13", default-features = false }
