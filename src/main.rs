@@ -200,7 +200,7 @@ fn main() -> Result<()> {
                                                     _owned: bool,
                                                 }
                                                 let signptr: &HackSignature =
-                                                    unsafe { std::mem::transmute(&sign) };
+                                                    unsafe { &*(&sign as *const git2::Signature as *const HackSignature) };
                                                 if signptr.raw.is_null() {
                                                     warn!("bad signature found in file: {:?}. might be an author without an email or something (bug in libgit2)", old_path);
                                                 } else {
