@@ -205,8 +205,8 @@ fn main() -> Result<()> {
                                                     warn!("bad signature found in file: {:?}. might be an author without an email or something (bug in libgit2)", old_path);
                                                 } else {
                                                     let author = (
-                                                        sign.name().map(|s| String::from(s)),
-                                                        sign.email().map(|s| String::from(s)),
+                                                        sign.name().map(String::from),
+                                                        sign.email().map(String::from),
                                                     );
                                                     modified
                                                         .entry(author)
@@ -261,8 +261,8 @@ fn main() -> Result<()> {
         println!(
             "{}\t{} <{}>",
             lines,
-            name.unwrap_or("?".into()),
-            email.unwrap_or("?".into())
+            name.unwrap_or_else(|| "?".into()),
+            email.unwrap_or_else(|| "?".into())
         );
     }
     Ok(())
