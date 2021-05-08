@@ -181,12 +181,16 @@ fn main() -> Result<()> {
                                         hunk.old_start()..(hunk.old_start() + hunk.old_lines())
                                     {
                                         if let Some(oldhunk) = blame.get_line(line as usize) {
-                                             if let Some(commit) = stop_at {
-                                                let key = (commit, oldhunk.final_commit_id());
+                                            if let Some(stop) = stop_at {
+                                                let line_commit = oldhunk.final_commit_id();
+                                                if line_commit == stop {
+                                                    continue;
+                                                }
+                                                let key = (stop, line_commit);
                                                 let mut map = merge_base_tls.get_or_default().borrow_mut();
                                                 let base = map.entry(key).or_insert_with(|| repo.merge_base(key.0, key.1).ok());
                                                 if let Some(b) = base {
-                                                    if *b != commit {
+                                                    if *b != stop {
                                                         // this seems to happen a lot. oldest_commit on blame options doesn't seem to do what I expected :(
                                                         continue;
                                                     }
