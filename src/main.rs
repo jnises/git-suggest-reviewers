@@ -74,11 +74,13 @@ fn main() -> Result<()> {
     let base = repo
         .revparse_single(&opt.base)
         .context("unable to find base")?
+        .peel_to_commit()?
         .id();
     info!("base: {}", base);
     let compare = repo
         .revparse_single(&opt.compare)
         .context("unable to find compare")?
+        .peel_to_commit()?
         .id();
     info!("compare: {}", compare);
     let merge_base = repo
@@ -89,6 +91,7 @@ fn main() -> Result<()> {
         let mut commit = repo
             .revparse_single(&stop_at)
             .context("unable to find stop_at commit")?
+            .peel_to_commit()?
             .id();
         let base = repo.merge_base(merge_base, commit)?;
         if base != commit {
