@@ -19,10 +19,6 @@ struct Opt {
     /// Where to merge from
     compare: String,
 
-    /// Ignore files larger than this (in bytes) to make things faster
-    #[structopt(long)]
-    max_file_size: Option<u64>,
-
     /// Verbose mode (-v, -vv, -vvv, etc), disables progress bar
     #[structopt(short, long, parse(from_occurrences))]
     verbose: usize,
@@ -117,7 +113,6 @@ fn main() -> Result<()> {
     progress.set_style(ProgressStyle::default_bar());
     progress.set_length(num_deltas as u64);
     let context = opt.context;
-    let max_file_size = opt.max_file_size;
     type ModifiedMap = HashMap<(Option<String>, Option<String>), usize>;
     let repo_tls: ThreadLocal<Repository> = ThreadLocal::new();
     let diff_tls: ThreadLocal<Diff> = ThreadLocal::new();
@@ -140,14 +135,6 @@ fn main() -> Result<()> {
                     } else if delta.old_file().is_binary() || delta.new_file().is_binary() {
                         debug!("skipping blame of {:?} because it is binary", old_path);
                     } else {
-                        let max_size =
-                            std::cmp::max(delta.old_file().size(), delta.new_file().size());
-                        if max_size > max_file_size.unwrap_or(std::u64::MAX) {
-                            debug!(
-                                "skipping blame of {:?} because it is too large ({})",
-                                old_path, max_size
-                            );
-                        } else {
                             if !delta.new_file().exists() {
                                 info!("processing {:?} -> [deleted]", old_path);
                             } else if let Some(new_path) = delta.new_file().path() {
@@ -226,7 +213,6 @@ fn main() -> Result<()> {
                                     debug!("error blaming {:?}: {}", old_path, e);
                                 }
                             }
-                        }
                     }
                 } else {
                     debug!(
