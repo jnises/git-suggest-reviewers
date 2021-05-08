@@ -114,7 +114,8 @@ fn main() -> Result<()> {
     type ModifiedMap = HashMap<(Option<String>, Option<String>), usize>;
     let repo_tls: ThreadLocal<Repository> = ThreadLocal::new();
     let diff_tls: ThreadLocal<Diff> = ThreadLocal::new();
-    let merge_base_tls: ThreadLocal<RefCell<HashMap<(Oid, Oid), Option<Oid>>>> = ThreadLocal::new();
+    type MergeBaseMap = HashMap<(Oid, Oid), Option<Oid>>;
+    let merge_base_tls: ThreadLocal<RefCell<MergeBaseMap>> = ThreadLocal::new();
     let modified = (0..num_deltas).into_par_iter().map(|deltaidx| -> Result<ModifiedMap> {
         let mut modified: ModifiedMap = HashMap::new();
         let repo = repo_tls.get_or_try(get_repo)?;
