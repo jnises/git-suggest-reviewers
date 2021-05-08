@@ -31,9 +31,9 @@ struct Opt {
     #[structopt(long, default_value = "1")]
     context: u32,
 
-    /// Don't look further back than this when blaming files
+    /// Try not to look further back than this when blaming files
     #[structopt(long)]
-    first_commit: Option<String>,
+    stop_at: Option<String>,
 
     // Maximum number of threads. 0 is auto.
     #[structopt(long, short = "j", default_value = "0")]
@@ -81,30 +81,28 @@ fn main() -> Result<()> {
         .context("unable to find compare")?
         .id();
     info!("compare: {}", compare);
-    let first_commit = if let Some(first_commit) = opt.first_commit {
-        let commit = repo
-            .revparse_single(&first_commit)
-            .context("unable to find first_commit")?
+    let merge_base = repo
+        .merge_base(base, compare)
+        .context("unable to find merge base")?;
+    info!("merge base: {:?}", merge_base);
+    let stop_at = if let Some(stop_at) = opt.stop_at {
+        let mut commit = repo
+            .revparse_single(&stop_at)
+            .context("unable to find stop_at commit")?
             .id();
-        info!("first commit: {}", commit);
+        let base = repo.merge_base(merge_base, commit)?;
+        if base != commit {
+            warn!(
+                "stop_at ({}) not an ancestor of {} and {}. using {} instead.",
+                commit, merge_base, compare, base
+            );
+        }
+        commit = base;
+        info!("stopping at commit: {}", commit);
         Some(commit)
     } else {
         None
     };
-    let merge_base = repo
-        .merge_base(base, compare)
-        .context("unable to find merge base")?;
-    if let Some(commit) = first_commit {
-        if let Ok(base) = repo.merge_base(merge_base, commit) {
-            if base != commit {
-                warn!(
-                    "first_commit ({}) not an ancestor of {} and {}",
-                    commit, base, compare
-                );
-            }
-        }
-    }
-    info!("merge base: {:?}", merge_base);
     let diff =
         get_diff(&repo, merge_base, compare, opt.context).context("error calculating diff")?;
     progress.tick();
@@ -135,84 +133,95 @@ fn main() -> Result<()> {
                     } else if delta.old_file().is_binary() || delta.new_file().is_binary() {
                         debug!("skipping blame of {:?} because it is binary", old_path);
                     } else {
-                            if !delta.new_file().exists() {
-                                info!("processing {:?} -> [deleted]", old_path);
-                            } else if let Some(new_path) = delta.new_file().path() {
-                                if old_path == new_path {
-                                    info!("processing {:?}", old_path);
-                                } else {
-                                    info!("processing {:?} -> {:?}", old_path, new_path);
-                                }
+                        if !delta.new_file().exists() {
+                            info!("processing {:?} -> [deleted]", old_path);
+                        } else if let Some(new_path) = delta.new_file().path() {
+                            if old_path == new_path {
+                                info!("processing {:?}", old_path);
                             } else {
-                                debug!("new new_file for {:?}", old_path);
+                                info!("processing {:?} -> {:?}", old_path, new_path);
                             }
-                            let mut min_line = None;
-                            let mut max_line = None;
-                            for hunkidx in 0..patch.num_hunks() {
-                                let (hunk, _) = patch.hunk(hunkidx)?;
-                                min_line = Some(cmp::min(
-                                    min_line.unwrap_or(std::u32::MAX),
-                                    hunk.old_start(),
-                                ));
-                                max_line = Some(cmp::max(
-                                    max_line.unwrap_or(std::u32::MIN),
-                                    hunk.old_start() + hunk.old_lines(),
-                                ));
-                            }
-                            let mut blame_options = BlameOptions::new();
-                            blame_options
-                                .newest_commit(merge_base)
-                                .use_mailmap(true)
-                                // not sure what this one does, but it sounds useful
-                                //.track_copies_same_commit_moves(true);
-                                ;
-                            if let (Some(min), Some(max)) = (min_line, max_line) {
-                                blame_options.min_line(min as usize).max_line(max as usize);
-                            }
-                            if let Some(commit) = first_commit {
-                                blame_options.oldest_commit(commit);
-                            }
-                            match repo.blame_file(old_path, Some(&mut blame_options)) {
-                                Ok(blame) => {
-                                    for hunkidx in 0..patch.num_hunks() {
-                                        let (hunk, _) = patch.hunk(hunkidx)?;
-                                        for line in
-                                            hunk.old_start()..(hunk.old_start() + hunk.old_lines())
-                                        {
-                                            if let Some(oldhunk) = blame.get_line(line as usize) {
-                                                let sign = oldhunk.final_signature();
-                                                // !!! hack to work around bug in libgit2 (?)
-                                                struct HackSignature {
-                                                    raw: *const std::ffi::c_void,
-                                                    _owned: bool,
+                        } else {
+                            debug!("new new_file for {:?}", old_path);
+                        }
+                        let mut min_line = None;
+                        let mut max_line = None;
+                        for hunkidx in 0..patch.num_hunks() {
+                            let (hunk, _) = patch.hunk(hunkidx)?;
+                            min_line = Some(cmp::min(
+                                min_line.unwrap_or(std::u32::MAX),
+                                hunk.old_start(),
+                            ));
+                            max_line = Some(cmp::max(
+                                max_line.unwrap_or(std::u32::MIN),
+                                hunk.old_start() + hunk.old_lines(),
+                            ));
+                        }
+                        let mut blame_options = BlameOptions::new();
+                        blame_options
+                            .newest_commit(merge_base)
+                            .use_mailmap(true)
+                            // not sure what this one does, but it sounds useful
+                            //.track_copies_same_commit_moves(true);
+                            ;
+                        // TODO blame each separate continuous chunk of changed lines instead?
+                        if let (Some(min), Some(max)) = (min_line, max_line) {
+                            blame_options.min_line(min as usize).max_line(max as usize);
+                        }
+                        if let Some(commit) = stop_at {
+                            blame_options.oldest_commit(commit);
+                        }
+                        match repo.blame_file(old_path, Some(&mut blame_options)) {
+                            Ok(blame) => {
+                                for hunkidx in 0..patch.num_hunks() {
+                                    let (hunk, _) = patch.hunk(hunkidx)?;
+                                    for line in
+                                        hunk.old_start()..(hunk.old_start() + hunk.old_lines())
+                                    {
+                                        if let Some(oldhunk) = blame.get_line(line as usize) {
+                                             if let Some(commit) = stop_at {
+                                                // TODO cache this
+                                                if let Ok(base) = repo.merge_base(commit, oldhunk.final_commit_id()) {
+                                                    if base != commit {
+                                                        // this seems to happen a lot. oldest_commit on blame options doesn't seem to do what I expected :(
+                                                        continue;
+                                                    }
                                                 }
-                                                let signptr: &HackSignature =
-                                                    unsafe { &*(&sign as *const git2::Signature as *const HackSignature) };
-                                                if signptr.raw.is_null() {
-                                                    warn!("bad signature found in file: {:?}. might be an author without an email or something (bug in libgit2)", old_path);
-                                                } else {
-                                                    let author = (
-                                                        sign.name().map(String::from),
-                                                        sign.email().map(String::from),
-                                                    );
-                                                    modified
-                                                        .entry(author)
-                                                        .and_modify(|e| *e += 1)
-                                                        .or_insert(1);
-                                                }
-                                            } else {
-                                                debug!(
-                                                    "line {} not found in {:?}@{}",
-                                                    line, old_path, merge_base
-                                                );
                                             }
+                                            let sign = oldhunk.final_signature();
+                                            // !!! hack to work around bug in libgit2 (?)
+                                            struct HackSignature {
+                                                raw: *const std::ffi::c_void,
+                                                _owned: bool,
+                                            }
+                                            let signptr: &HackSignature =
+                                                unsafe { &*(&sign as *const git2::Signature as *const HackSignature) };
+                                            if signptr.raw.is_null() {
+                                                warn!("bad signature found in file: {:?}. might be an author without an email or something (bug in libgit2)", old_path);
+                                            } else {
+                                                debug!("path: {:?} commit: {} line: {}", old_path, oldhunk.final_commit_id(), line);
+                                                let author = (
+                                                    sign.name().map(String::from),
+                                                    sign.email().map(String::from),
+                                                );
+                                                modified
+                                                    .entry(author)
+                                                    .and_modify(|e| *e += 1)
+                                                    .or_insert(1);
+                                            }
+                                        } else {
+                                            debug!(
+                                                "line {} not found in {:?}@{}",
+                                                line, old_path, merge_base
+                                            );
                                         }
                                     }
                                 }
-                                Err(e) => {
-                                    debug!("error blaming {:?}: {}", old_path, e);
-                                }
                             }
+                            Err(e) => {
+                                debug!("error blaming {:?}: {}", old_path, e);
+                            }
+                        }
                     }
                 } else {
                     debug!(
