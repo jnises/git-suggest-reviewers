@@ -4,7 +4,7 @@ use git2::{BlameOptions, Diff, DiffFindOptions, DiffOptions, FileMode, Oid, Patc
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, info, warn};
 use rayon::prelude::*;
-use std::{cmp, collections::HashMap};
+use std::{cell::RefCell, cmp, collections::HashMap};
 use structopt::StructOpt;
 use thread_local::ThreadLocal;
 
@@ -31,7 +31,7 @@ struct Opt {
     #[structopt(long, default_value = "1")]
     context: u32,
 
-    /// Try not to look further back than this when blaming files
+    /// Try not to look further back than this commit when blaming files
     #[structopt(long)]
     stop_at: Option<String>,
 
@@ -114,6 +114,7 @@ fn main() -> Result<()> {
     type ModifiedMap = HashMap<(Option<String>, Option<String>), usize>;
     let repo_tls: ThreadLocal<Repository> = ThreadLocal::new();
     let diff_tls: ThreadLocal<Diff> = ThreadLocal::new();
+    let merge_base_tls: ThreadLocal<RefCell<HashMap<(Oid, Oid), Option<Oid>>>> = ThreadLocal::new();
     let modified = (0..num_deltas).into_par_iter().map(|deltaidx| -> Result<ModifiedMap> {
         let mut modified: ModifiedMap = HashMap::new();
         let repo = repo_tls.get_or_try(get_repo)?;
@@ -181,8 +182,11 @@ fn main() -> Result<()> {
                                         if let Some(oldhunk) = blame.get_line(line as usize) {
                                              if let Some(commit) = stop_at {
                                                 // TODO cache this
-                                                if let Ok(base) = repo.merge_base(commit, oldhunk.final_commit_id()) {
-                                                    if base != commit {
+                                                let key = (commit, oldhunk.final_commit_id());
+                                                let mut map = merge_base_tls.get_or_default().borrow_mut();
+                                                let base = map.entry(key).or_insert_with(|| repo.merge_base(key.0, key.1).ok());
+                                                if let Some(b) = base {
+                                                    if *b != commit {
                                                         // this seems to happen a lot. oldest_commit on blame options doesn't seem to do what I expected :(
                                                         continue;
                                                     }
