@@ -181,7 +181,6 @@ fn main() -> Result<()> {
                                     {
                                         if let Some(oldhunk) = blame.get_line(line as usize) {
                                              if let Some(commit) = stop_at {
-                                                // TODO cache this
                                                 let key = (commit, oldhunk.final_commit_id());
                                                 let mut map = merge_base_tls.get_or_default().borrow_mut();
                                                 let base = map.entry(key).or_insert_with(|| repo.merge_base(key.0, key.1).ok());
@@ -250,6 +249,7 @@ fn main() -> Result<()> {
         }
         Ok(acc)
     })?;
+    drop(merge_base_tls);
     drop(diff_tls);
     drop(repo_tls);
     let mut modified_sorted = modified.into_iter().collect::<Vec<_>>();
