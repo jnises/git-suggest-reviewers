@@ -210,9 +210,20 @@ fn main() -> Result<()> {
                                             if signptr.raw.is_null() {
                                                 warn!("bad signature found in file: {:?}. might be an author without an email or something (bug in libgit2)", old_path);
                                             } else {
+                                                let resolved_sign = if let Ok(mailmap) = repo.mailmap() {
+                                                    match mailmap.resolve_signature(&sign) {
+                                                        Ok(s) => s,
+                                                        Err(e) => {
+                                                            warn!("error resolving signature {} in mailmap {}", sign, e);
+                                                            sign
+                                                        }
+                                                    }
+                                                } else {
+                                                    sign
+                                                };
                                                 let author = (
-                                                    sign.name().map(String::from),
-                                                    sign.email().map(String::from),
+                                                    resolved_sign.name().map(String::from),
+                                                    resolved_sign.email().map(String::from),
                                                 );
                                                 modified
                                                     .entry(author)
