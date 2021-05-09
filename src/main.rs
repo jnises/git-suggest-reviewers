@@ -210,7 +210,6 @@ fn main() -> Result<()> {
                                             if signptr.raw.is_null() {
                                                 warn!("bad signature found in file: {:?}. might be an author without an email or something (bug in libgit2)", old_path);
                                             } else {
-                                                debug!("path: {:?} commit: {} line: {}", old_path, oldhunk.final_commit_id(), line);
                                                 let author = (
                                                     sign.name().map(String::from),
                                                     sign.email().map(String::from),
