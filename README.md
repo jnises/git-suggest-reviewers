@@ -12,9 +12,6 @@ rust (https://rustup.rs/)
 
 ## usage
 
-git-suggest-reviewers 1.4.0
-List authors of lines changed by PR, including a few lines around the changed ones.
-
     USAGE:
         git-suggest-reviewers [FLAGS] [OPTIONS] <base> <compare>
 
