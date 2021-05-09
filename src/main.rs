@@ -74,11 +74,13 @@ fn main() -> Result<()> {
     let base = repo
         .revparse_single(&opt.base)
         .context("unable to find base")?
+        .peel_to_commit()?
         .id();
     info!("base: {}", base);
     let compare = repo
         .revparse_single(&opt.compare)
         .context("unable to find compare")?
+        .peel_to_commit()?
         .id();
     info!("compare: {}", compare);
     let merge_base = repo
@@ -89,6 +91,7 @@ fn main() -> Result<()> {
         let mut commit = repo
             .revparse_single(&stop_at)
             .context("unable to find stop_at commit")?
+            .peel_to_commit()?
             .id();
         let base = repo.merge_base(merge_base, commit)?;
         if base != commit {
@@ -181,12 +184,16 @@ fn main() -> Result<()> {
                                         hunk.old_start()..(hunk.old_start() + hunk.old_lines())
                                     {
                                         if let Some(oldhunk) = blame.get_line(line as usize) {
-                                             if let Some(commit) = stop_at {
-                                                let key = (commit, oldhunk.final_commit_id());
+                                            if let Some(stop) = stop_at {
+                                                let line_commit = oldhunk.final_commit_id();
+                                                if line_commit == stop {
+                                                    continue;
+                                                }
+                                                let key = (stop, line_commit);
                                                 let mut map = merge_base_tls.get_or_default().borrow_mut();
                                                 let base = map.entry(key).or_insert_with(|| repo.merge_base(key.0, key.1).ok());
                                                 if let Some(b) = base {
-                                                    if *b != commit {
+                                                    if *b != stop {
                                                         // this seems to happen a lot. oldest_commit on blame options doesn't seem to do what I expected :(
                                                         continue;
                                                     }
@@ -203,7 +210,6 @@ fn main() -> Result<()> {
                                             if signptr.raw.is_null() {
                                                 warn!("bad signature found in file: {:?}. might be an author without an email or something (bug in libgit2)", old_path);
                                             } else {
-                                                debug!("path: {:?} commit: {} line: {}", old_path, oldhunk.final_commit_id(), line);
                                                 let author = (
                                                     sign.name().map(String::from),
                                                     sign.email().map(String::from),
