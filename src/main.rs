@@ -122,8 +122,8 @@ fn main() -> Result<()> {
     let modified = (0..num_deltas).into_par_iter().map(|deltaidx| -> Result<ModifiedMap> {
         let mut modified: ModifiedMap = HashMap::new();
         let repo = repo_tls.get_or_try(get_repo)?;
-        let diff = diff_tls.get_or_try(|| get_diff(&repo, merge_base, compare, context))?;
-        match Patch::from_diff(&diff, deltaidx) {
+        let diff = diff_tls.get_or_try(|| get_diff(repo, merge_base, compare, context))?;
+        match Patch::from_diff(diff, deltaidx) {
             Ok(Some(patch)) => {
                 let delta = patch.delta();
                 if delta.old_file().exists() {
