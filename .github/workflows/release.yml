@@ -33,7 +33,7 @@ jobs:
           path: git-suggest-reviewers_win_x64.exe
 
   mac_build:
-    runs-on: macos-10.15
+    runs-on: macos-11
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
