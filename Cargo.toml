@@ -1,6 +1,6 @@
 [package]
 name = "git-suggest-reviewers"
-version = "1.4.5"
+version = "1.4.6"
 authors = ["Joel Nises <joel.nises@gmail.com>"]
 edition = "2021"
 
@@ -15,4 +15,4 @@ stderrlog = "0.5"
 indicatif = "0.16"
 rayon = "1.5"
 thread_local = "1.0"
-git2 = { version = "0.13", default-features = false }
+git2 = { version = "0.14", default-features = false }
