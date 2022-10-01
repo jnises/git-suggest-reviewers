@@ -1,6 +1,6 @@
 [package]
 name = "git-suggest-reviewers"
-version = "1.4.8"
+version = "1.4.9"
 authors = ["Joel Nises <joel.nises@gmail.com>"]
 edition = "2021"
 
@@ -9,7 +9,7 @@ lto = true
 
 [dependencies]
 anyhow = "1.0"
-structopt = "0.3"
+clap = { version = "4.0", features = ["derive"] }
 log = "0.4"
 stderrlog = "0.5"
 indicatif = "0.17"

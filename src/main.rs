@@ -1,16 +1,18 @@
 // #![warn(missing_debug_implementations, rust_2018_idoms, clippy:all)]
 use anyhow::{Context, Result};
+use clap::Parser;
 use git2::{BlameOptions, Diff, DiffFindOptions, DiffOptions, FileMode, Oid, Patch, Repository};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, info, warn};
 use rayon::prelude::*;
 use std::{cell::RefCell, cmp, collections::HashMap};
-use structopt::StructOpt;
 use thread_local::ThreadLocal;
 
-#[derive(Debug, StructOpt)]
-#[structopt(
-    about = "List authors of lines changed by PR, including a few lines around the changed ones."
+#[derive(Debug, Parser)]
+#[command(
+    about = "List authors of lines changed by PR, including a few lines around the changed ones.",
+    author,
+    version
 )]
 struct Opt {
     /// Where to merge to
@@ -20,23 +22,23 @@ struct Opt {
     compare: String,
 
     /// Verbose mode (-v, -vv, -vvv, etc), disables progress bar
-    #[structopt(short, long, parse(from_occurrences))]
-    verbose: usize,
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    verbose: u8,
 
     /// Don't display a progress bar
-    #[structopt(long)]
+    #[arg(long)]
     no_progress: bool,
 
     /// How many lines around each modification to count
-    #[structopt(long, default_value = "1")]
+    #[arg(long, default_value = "1")]
     context: u32,
 
     /// Try not to look further back than this commit when blaming files
-    #[structopt(long)]
+    #[arg(long)]
     stop_at: Option<String>,
 
     // Maximum number of threads. 0 is auto.
-    #[structopt(long, short = "j", default_value = "0")]
+    #[arg(long, short = 'j', default_value = "0")]
     max_concurrency: usize,
 }
 
@@ -59,8 +61,8 @@ fn get_diff(repo: &Repository, base: Oid, compare: Oid, context: u32) -> Result<
 }
 
 fn main() -> Result<()> {
-    let opt = Opt::from_args();
-    stderrlog::new().verbosity(opt.verbose).init()?;
+    let opt = Opt::parse();
+    stderrlog::new().verbosity(opt.verbose as usize).init()?;
     rayon::ThreadPoolBuilder::new()
         .num_threads(opt.max_concurrency)
         .build_global()?;
