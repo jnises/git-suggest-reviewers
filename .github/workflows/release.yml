@@ -7,10 +7,10 @@ on:
 
 jobs:
   win_build:
-    runs-on: windows-2019
+    runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/bin/
@@ -27,16 +27,16 @@ jobs:
         run: |
           cargo build --release
           mv target/release/git-suggest-reviewers.exe git-suggest-reviewers_win_x64.exe
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: git-suggest-reviewers_win_x64.exe
           path: git-suggest-reviewers_win_x64.exe
 
   mac_build:
-    runs-on: macos-11
+    runs-on: macos-12
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/bin/
@@ -56,17 +56,18 @@ jobs:
           ARTIFACT="target/x86_64-apple-darwin/release/git-suggest-reviewers"
           strip -S "$ARTIFACT"
           ditto -c -k --sequesterRsrc "$ARTIFACT" git-suggest-reviewers_mac_x64.zip
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: git-suggest-reviewers_mac_x64.zip
           path: git-suggest-reviewers_mac_x64.zip
       - name: Build aarch64
+        # getting sdk using xcrun to cross compile. is this still needed these days?
         run: |
-          SDKROOT=$(xcrun -sdk macosx11.1 --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx11.1 --show-sdk-platform-version) cargo build --release --target aarch64-apple-darwin
+          SDKROOT=$(xcrun -sdk macosx12.3 --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx11.1 --show-sdk-platform-version) cargo build --release --target aarch64-apple-darwin
           ARTIFACT="target/aarch64-apple-darwin/release/git-suggest-reviewers"
           strip -S "$ARTIFACT"
           ditto -c -k --sequesterRsrc "$ARTIFACT" git-suggest-reviewers_mac_aarch64.zip
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: git-suggest-reviewers_mac_aarch64.zip
           path: git-suggest-reviewers_mac_aarch64.zip          
@@ -75,13 +76,13 @@ jobs:
     needs: [win_build, mac_build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: git-suggest-reviewers_mac_x64.zip
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: git-suggest-reviewers_mac_aarch64.zip        
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: git-suggest-reviewers_win_x64.exe
       # zip the win build here.
