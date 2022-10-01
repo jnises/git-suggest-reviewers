@@ -1,17 +1,18 @@
 // #![warn(missing_debug_implementations, rust_2018_idoms, clippy:all)]
 use anyhow::{Context, Result};
+use clap::Parser;
 use git2::{BlameOptions, Diff, DiffFindOptions, DiffOptions, FileMode, Oid, Patch, Repository};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, info, warn};
 use rayon::prelude::*;
 use std::{cell::RefCell, cmp, collections::HashMap};
 use thread_local::ThreadLocal;
-use clap::Parser;
 
 #[derive(Debug, Parser)]
 #[command(
     about = "List authors of lines changed by PR, including a few lines around the changed ones.",
-    author, version
+    author,
+    version
 )]
 struct Opt {
     /// Where to merge to
