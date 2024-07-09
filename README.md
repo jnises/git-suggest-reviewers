@@ -2,14 +2,6 @@
 
 Tool that suggests which reviewers to pick for a PR based on who have previously authored the lines modified by the PR.
 
-## requirements
-
-rust (https://rustup.rs/)
-
-## build
-
-`cargo build --release`
-
 ## usage
 
     USAGE:
@@ -30,7 +22,7 @@ rust (https://rustup.rs/)
         <base>       Where to merge to
         <compare>    Where to merge from
 
-Output will be on lines on the form
+Output will be on the form
 
 ```
 223 Dade <dade@example.com>
@@ -39,6 +31,14 @@ Output will be on lines on the form
 ```
 
 sorted by the number of lines authored by that developer.
+
+## installing from source
+
+Make sure you have rust installed (https://rustup.rs/)
+
+```bash
+cargo install --git https://github.com/jnises/git-suggest-reviewers
+```
 
 ## known issues
 
