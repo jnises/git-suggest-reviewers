@@ -156,11 +156,11 @@ fn main() -> Result<()> {
                         for hunkidx in 0..patch.num_hunks() {
                             let (hunk, _) = patch.hunk(hunkidx)?;
                             min_line = Some(cmp::min(
-                                min_line.unwrap_or(std::u32::MAX),
+                                min_line.unwrap_or(u32::MAX),
                                 hunk.old_start(),
                             ));
                             max_line = Some(cmp::max(
-                                max_line.unwrap_or(std::u32::MIN),
+                                max_line.unwrap_or(u32::MIN),
                                 hunk.old_start() + hunk.old_lines(),
                             ));
                         }

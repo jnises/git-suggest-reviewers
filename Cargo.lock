@@ -234,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "git-suggest-reviewers"
-version = "1.4.12"
+version = "1.4.13"
 dependencies = [
  "anyhow",
  "clap",
