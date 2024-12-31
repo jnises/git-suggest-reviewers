@@ -24,7 +24,7 @@ jobs:
         run: |
           cargo build --release
           mv target/release/git-suggest-reviewers.exe git-suggest-reviewers_win_x64.exe
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: git-suggest-reviewers_win_x64.exe
           path: git-suggest-reviewers_win_x64.exe
@@ -51,7 +51,7 @@ jobs:
           ARTIFACT="target/x86_64-apple-darwin/release/git-suggest-reviewers"
           strip -S "$ARTIFACT"
           ditto -c -k --sequesterRsrc "$ARTIFACT" git-suggest-reviewers_mac_x64.zip
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: git-suggest-reviewers_mac_x64.zip
           path: git-suggest-reviewers_mac_x64.zip
