@@ -27,9 +27,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
       - name: Build aarch64
         run: |
-          cargo build --release
+          cargo build --release --target aarch64-apple-darwin
           ARTIFACT="target/aarch64-apple-darwin/release/git-suggest-reviewers"
           strip -S "$ARTIFACT"
           ditto -c -k --sequesterRsrc "$ARTIFACT" git-suggest-reviewers_mac_aarch64.zip
