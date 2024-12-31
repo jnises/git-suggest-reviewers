@@ -30,7 +30,7 @@ jobs:
           path: git-suggest-reviewers_win_x64.exe
 
   mac_build:
-    runs-on: macos-13
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -43,26 +43,13 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin, x86_64-apple-darwin
-      - name: Build x86_64
-        run: |
-          cargo build --release --target x86_64-apple-darwin
-          ARTIFACT="target/x86_64-apple-darwin/release/git-suggest-reviewers"
-          strip -S "$ARTIFACT"
-          ditto -c -k --sequesterRsrc "$ARTIFACT" git-suggest-reviewers_mac_x64.zip
-      - uses: actions/upload-artifact@v4
-        with:
-          name: git-suggest-reviewers_mac_x64.zip
-          path: git-suggest-reviewers_mac_x64.zip
       - name: Build aarch64
-        # getting sdk using xcrun to cross compile. is this still needed these days?
         run: |
-          SDKROOT=$(xcrun -sdk macosx12.3 --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx11.1 --show-sdk-platform-version) cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target aarch64-apple-darwin
           ARTIFACT="target/aarch64-apple-darwin/release/git-suggest-reviewers"
           strip -S "$ARTIFACT"
           ditto -c -k --sequesterRsrc "$ARTIFACT" git-suggest-reviewers_mac_aarch64.zip
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: git-suggest-reviewers_mac_aarch64.zip
           path: git-suggest-reviewers_mac_aarch64.zip          
@@ -71,13 +58,10 @@ jobs:
     needs: [win_build, mac_build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v3
-        with:
-          name: git-suggest-reviewers_mac_x64.zip
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: git-suggest-reviewers_mac_aarch64.zip        
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: git-suggest-reviewers_win_x64.exe
       # zip the win build here.
@@ -94,14 +78,6 @@ jobs:
           release_name: Release ${{ github.ref }}
           draft: false
           prerelease: false
-      - uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./git-suggest-reviewers_mac_x64.zip
-          asset_name: git-suggest-reviewers_mac_x64.zip
-          asset_content_type: application/zip
       - uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
