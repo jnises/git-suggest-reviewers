@@ -30,7 +30,7 @@ jobs:
           path: git-suggest-reviewers_win_x64.exe
 
   mac_build:
-    runs-on: macos-12
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
