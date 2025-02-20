@@ -2,7 +2,7 @@
 name = "git-suggest-reviewers"
 version = "1.4.14"
 authors = ["Joel Nises <joel.nises@gmail.com>"]
-edition = "2021"
+edition = "2024"
 
 [profile.release]
 lto = true
